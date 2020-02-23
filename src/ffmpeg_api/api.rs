@@ -36,17 +36,30 @@ impl<'a> AVFormatContext {
     }
 
     pub fn streams(&self) -> Vec<AVStream> {
-        return unsafe {
-            std::slice::from_raw_parts(
-                (*self.base).streams,
-                (*self.base).nb_streams as usize,
-            )
-        }
-            .iter()
-            .map(|stream| {
-                AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
-            })
-            .collect();
+        Vec::from(
+            unsafe {
+                std::slice::from_raw_parts(
+                    (*self.base).streams,
+                    (*self.base).nb_streams as usize,
+                )
+            }
+        ).iter().map(|stream| {
+            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
+        }).collect()
+    }
+
+    pub fn find_stream<P>(&self, predicate: P) -> Option<AVStream> where
+        P: FnMut(&AVStream) -> bool {
+        Vec::from(
+            unsafe {
+                std::slice::from_raw_parts(
+                    (*self.base).streams,
+                    (*self.base).nb_streams as usize,
+                )
+            }
+        ).iter().map(|stream| {
+            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
+        }).find(predicate)
     }
 
     pub fn read_frame(&/*TODO:mut*/ self, packet: &mut AVPacket) -> Result<(), failure::Error> {
