@@ -7,12 +7,16 @@ use image::{ImageBuffer, RgbImage};
 fn main() -> Result<(), std::io::Error> {
     let mut before = std::time::SystemTime::now();
 
-    let path = "/home/janne/Workspace/justflix/data/video.mp4";
+    let output = "/root/spritesheets";
+    let input = "/var/lib/data/jellyfin-media/shows/Star Trek: Picard/Season 01/S01E01 - Remembrance.mp4";
+
+    //let input = "/home/janne/Workspace/justflix/data/video.mp4";
+    //let output = "/home/janne/Workspace/justflix/data/spritesheets";
 
     let mut avformat_context = AVFormatContext::new().unwrap_or_else(|error| {
         panic!("Could not allocate a context to process the video: {:?}", error)
     });
-    avformat_context.open_input(path).unwrap_or_else(|error| {
+    avformat_context.open_input(input).unwrap_or_else(|error| {
         panic!("Could not open video input: {:?}", error)
     });
 
@@ -109,7 +113,7 @@ fn main() -> Result<(), std::io::Error> {
                     i += 1;
 
                     if i % (x * y) == 0 {
-                        spritesheet.save(format!("/home/janne/Workspace/justflix/data/spritesheets/spritesheet_{}.png", (i / (x*y)) - 1)).unwrap_or_else(|error| {
+                        spritesheet.save(format!("{}/spritesheet_{}.png", output, (i / (x * y)) - 1)).unwrap_or_else(|error| {
                             panic!("Could not write spritesheet: {}", error)
                         });
                         spritesheet = ImageBuffer::new(160 * x, 90 * x);
@@ -121,7 +125,7 @@ fn main() -> Result<(), std::io::Error> {
         }
 
         if i % (x * y) != 0 {
-            spritesheet.save(format!("/home/janne/Workspace/justflix/data/spritesheets/spritesheet_{}.png", i / (x*y))).unwrap_or_else(|error| {
+            spritesheet.save(format!("{}/spritesheet_{}.png", output, i / (x * y))).unwrap_or_else(|error| {
                 panic!("Could not write spritesheet: {}", error)
             });
             println!("Writing Time: {:#?}", before.elapsed().unwrap());
