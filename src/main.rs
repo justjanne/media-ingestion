@@ -48,11 +48,9 @@ fn main() -> Result<(), std::io::Error> {
             codec_context.set_skip_idct(AVDiscard::NonKey);
             codec_context.set_skip_frame(AVDiscard::NonKey);
 
-            // TODO: HERE BE DRAGONS
-            let packet: &mut ffi::AVPacket = unsafe {
-                ffi::av_packet_alloc().as_mut()
-            }.expect("not null");
-            // TODO: END DRAGONS
+            let mut packet = AVPacket::new().unwrap_or_else(|error| {
+                panic!("Could not init temporary packet: {:?}", error)
+            });
 
             let mut frame = AVFrame::new().unwrap_or_else(|error| {
                 panic!("Could not create input frame: {:?}", error)
@@ -63,10 +61,16 @@ fn main() -> Result<(), std::io::Error> {
             println!("Time: {:#?}", before.elapsed().unwrap());
             before = std::time::SystemTime::now();
 
+            let mut scale_context = SwsContext::new();
+
             //TODO: HERE BE DRAGONS
-            while unsafe { ffi::av_read_frame(avformat_context.raw(), packet) } >= 0 && i < 10 {
-                if packet.stream_index == stream.index() {
-                    unsafe { ffi::avcodec_send_packet(codec_context.raw(), packet) };
+            while unsafe { ffi::av_read_frame(avformat_context.raw(), packet.as_mut()) } >= 0 && i < 16 {
+                // TODO: END DRAGONS
+
+                if packet.stream_index() == stream.index() {
+
+                    //TODO: HERE BE DRAGONS
+                    unsafe { ffi::avcodec_send_packet(codec_context.raw(), packet.as_mut()) };
                     while unsafe { ffi::avcodec_receive_frame(codec_context.raw(), frame.as_mut()) } >= 0 {
                         // TODO: END DRAGONS
 
@@ -79,53 +83,26 @@ fn main() -> Result<(), std::io::Error> {
                         println!("Reading Time: {:#?}", before.elapsed().unwrap());
                         before = std::time::SystemTime::now();
 
-                        // TODO: HERE BE DRAGONS
-                        let sws_context = unsafe {
-                            ffi::sws_getContext(
-                                frame.width(),
-                                frame.height(),
-                                frame.format() as ffi::AVPixelFormat,
-                                output_frame.width(),
-                                output_frame.height(),
-                                output_frame.format() as ffi::AVPixelFormat,
-                                ffi::SWS_FAST_BILINEAR as i32,
-                                std::ptr::null_mut(),
-                                std::ptr::null_mut(),
-                                std::ptr::null(),
-                            ).as_mut()
-                        }.expect("not null");
+                        scale_context.reinit(&frame, &output_frame, SwsScaler::FastBilinear).unwrap_or_else(|error| {
+                            panic!("Could not reinit scale context: {:?}", error)
+                        });
+                        scale_context.scale(&frame, &mut output_frame);
 
-                        let success = unsafe {
-                            ffi::sws_scale(
-                                sws_context,
-                                frame.data_ptr(),
-                                frame.linesize().as_ptr(),
-                                0,
-                                frame.height(),
-                                output_frame.data_mut_ptr(),
-                                output_frame.linesize().as_ptr(),
-                            )
-                        };
-                        // TODO: END DRAGONS
-
-                        println!("success: {}", success);
                         println!("Processing Time: {:#?}", before.elapsed().unwrap());
                         before = std::time::SystemTime::now();
 
-                        if success > 0 {
-                            image::save_buffer(
-                                format!("/home/janne/Workspace/justflix/data/test/image_{}.png", i),
-                                output_frame.data(0),
-                                output_frame.width() as u32,
-                                output_frame.height() as u32,
-                                image::ColorType::Rgb8,
-                            ).unwrap();
-
-                            i += 1;
-                        }
+                        image::save_buffer(
+                            format!("/home/janne/Workspace/justflix/data/test/image_{}.png", i),
+                            output_frame.data(0),
+                            output_frame.width() as u32,
+                            output_frame.height() as u32,
+                            image::ColorType::Rgb8,
+                        ).unwrap();
 
                         println!("Writing Time: {:#?}", before.elapsed().unwrap());
                         before = std::time::SystemTime::now();
+
+                        i += 1;
                     }
                 }
             }

@@ -103,6 +103,49 @@ impl AVBuffer {
     }
 }
 
+pub struct AVPacket {
+    base: *mut ffi::AVPacket,
+}
+
+impl AVPacket {
+    pub fn new() -> Result<Self, failure::Error> {
+        let base = unsafe { ffi::av_packet_alloc() };
+        if base.is_null() {
+            bail!("av_packet_alloc() failed");
+        }
+        Ok(AVPacket { base })
+    }
+
+    // TODO: Just for testing
+    pub unsafe fn as_mut(&mut self) -> &mut ffi::AVPacket {
+        self.base.as_mut().expect("not null")
+    }
+
+    pub fn pts(&self) -> i64 {
+        let base = unsafe { self.base.as_ref() }.expect("not null");
+
+        base.pts
+    }
+
+    pub fn dts(&self) -> i64 {
+        let base = unsafe { self.base.as_ref() }.expect("not null");
+
+        base.dts
+    }
+
+    pub fn stream_index(&self) -> i32 {
+        let base = unsafe { self.base.as_ref() }.expect("not null");
+
+        base.stream_index
+    }
+}
+
+impl Drop for AVPacket {
+    fn drop(&mut self) {
+        unsafe { ffi::av_packet_free(&mut self.base) }
+    }
+}
+
 pub struct AVFrame {
     base: *mut ffi::AVFrame,
     buffer: AVBuffer,
@@ -413,5 +456,63 @@ impl AVCodecContext {
 impl Drop for AVCodecContext {
     fn drop(&mut self) {
         unsafe { ffi::avcodec_free_context(&mut self.base) }
+    }
+}
+
+pub struct SwsContext {
+    base: *mut ffi::SwsContext,
+}
+
+impl SwsContext {
+    pub fn new() -> Self {
+        SwsContext { base: std::ptr::null_mut() }
+    }
+
+    pub fn reinit(&mut self, source: &AVFrame, target: &AVFrame, scaler: SwsScaler) -> Result<(), failure::Error> {
+        let base = unsafe {
+            ffi::sws_getCachedContext(
+                self.base,
+                source.width(),
+                source.height(),
+                source.format() as ffi::AVPixelFormat,
+                target.width(),
+                target.height(),
+                target.format() as ffi::AVPixelFormat,
+                scaler as i32,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null(),
+            )
+        };
+        if base.is_null() {
+            bail!("sws_getCachedContext() failed");
+        }
+        self.base = base;
+
+        Ok(())
+    }
+
+    pub fn scale(&self, source: &AVFrame, target: &mut AVFrame) -> i32 {
+        self.scale_slice(source, target, 0, source.height())
+    }
+
+    pub fn scale_slice(&self, source: &AVFrame, target: &mut AVFrame, slice_from: i32, slice_to: i32) -> i32 {
+        unsafe {
+            ffi::sws_scale(
+                self.base,
+                source.data_ptr(),
+                source.linesize().as_ptr(),
+                slice_from,
+                slice_to,
+                target.data_mut_ptr(),
+                target.linesize().as_ptr(),
+            )
+        }
+    }
+}
+
+impl Drop for SwsContext {
+    fn drop(&mut self) {
+        unsafe { ffi::sws_freeContext(self.base) }
     }
 }

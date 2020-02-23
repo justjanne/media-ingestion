@@ -913,22 +913,40 @@ enum_from_primitive! {
 }
 
 enum_from_primitive! {
-    # [derive(Debug, Copy, Clone, PartialEq)]
-    # [repr(i32)]
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[repr(i32)]
     pub enum AVDiscard {
-        # [doc = "< discard nothing"]
+        #[doc = "< discard nothing"]
         None = ffi::AVDiscard_AVDISCARD_NONE,
-        # [doc = "< discard useless packets like 0 size packets in avi"]
-        Default =ffi::AVDiscard_AVDISCARD_DEFAULT,
-        # [doc = "< discard all non reference"]
+        #[doc = "< discard useless packets like 0 size packets in avi"]
+        Default = ffi::AVDiscard_AVDISCARD_DEFAULT,
+        #[doc = "< discard all non reference"]
         NonReference = ffi::AVDiscard_AVDISCARD_NONREF,
-        # [doc = "< discard all bidirectional frames"]
+        #[doc = "< discard all bidirectional frames"]
         BiDirectional = ffi::AVDiscard_AVDISCARD_BIDIR,
-        # [doc = "< discard all non intra frames"]
+        #[doc = "< discard all non intra frames"]
         NonIntra = ffi::AVDiscard_AVDISCARD_NONINTRA,
-        # [doc = "< discard all frames except keyframes"]
+        #[doc = "< discard all frames except keyframes"]
         NonKey = ffi::AVDiscard_AVDISCARD_NONKEY,
-        # [doc = "< discard all"]
-        All =ffi::AVDiscard_AVDISCARD_ALL
+        #[doc = "< discard all"]
+        All = ffi::AVDiscard_AVDISCARD_ALL,
+    }
+}
+
+enum_from_primitive! {
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[repr(u32)]
+    pub enum SwsScaler {
+        FastBilinear = ffi::SWS_FAST_BILINEAR,
+        Bilinear = ffi::SWS_BILINEAR,
+        Bicubic = ffi::SWS_BICUBIC,
+        X = ffi::SWS_X,
+        Point = ffi::SWS_POINT,
+        Area = ffi::SWS_AREA,
+        Bicublin = ffi::SWS_BICUBLIN,
+        Gauss = ffi::SWS_GAUSS,
+        Sinc = ffi::SWS_SINC,
+        Lanczos = ffi::SWS_LANCZOS,
+        Spline = ffi::SWS_SPLINE,
     }
 }
