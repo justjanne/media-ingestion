@@ -6,17 +6,6 @@ use fraction::Fraction;
 
 use crate::ffmpeg_api::enums::*;
 
-// TODO: Use proper errors (with struct etc) for this
-enum_from_primitive! {
-    #[derive(Debug, Copy, Clone, PartialEq)]
-    #[repr(i32)]
-    pub enum AVErrorKind {
-        Unknown = ffi::AVERROR_EXPERIMENTAL,
-        InputChanged = ffi::AVERROR_INPUT_CHANGED,
-        OutputChanged = ffi::AVERROR_OUTPUT_CHANGED
-    }
-}
-
 pub struct AVFormatContext {
     base: *mut ffi::AVFormatContext,
 }
@@ -28,11 +17,6 @@ impl<'a> AVFormatContext {
             bail!("avformat_alloc_context() failed");
         }
         Ok(AVFormatContext { base })
-    }
-
-    // TODO: Just for testing
-    pub unsafe fn raw(&self) -> *mut ffi::AVFormatContext {
-        self.base
     }
 
     pub fn open_input(&mut self, path: &str) -> Result<(), failure::Error> {
@@ -63,6 +47,13 @@ impl<'a> AVFormatContext {
                 AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
             })
             .collect();
+    }
+
+    pub fn read_frame(&/*TODO:mut*/ self, packet: &mut AVPacket) -> Result<(), failure::Error> {
+        match unsafe { ffi::av_read_frame(self.base, packet.base) } {
+            0 => Ok(()),
+            errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
+        }
     }
 }
 
@@ -116,11 +107,6 @@ impl AVPacket {
         Ok(AVPacket { base })
     }
 
-    // TODO: Just for testing
-    pub unsafe fn as_mut(&mut self) -> &mut ffi::AVPacket {
-        self.base.as_mut().expect("not null")
-    }
-
     pub fn pts(&self) -> i64 {
         let base = unsafe { self.base.as_ref() }.expect("not null");
 
@@ -160,12 +146,7 @@ impl AVFrame {
         Ok(AVFrame { base, buffer: AVBuffer::empty() })
     }
 
-    // TODO: Just for testing
-    pub unsafe fn as_mut(&mut self) -> &mut ffi::AVFrame {
-        self.base.as_mut().expect("not null")
-    }
-
-    pub fn init(&mut self, width: i32, height: i32, format: AVPixelFormat) -> Result<(), failure::Error>{
+    pub fn init(&mut self, width: i32, height: i32, format: AVPixelFormat) -> Result<(), failure::Error> {
         let mut base = unsafe { self.base.as_mut() }.expect("not null");
 
         base.width = width;
@@ -345,11 +326,6 @@ impl<'a> AVCodecParameters<'a> {
         return AVCodecParameters { base, phantom: PhantomData };
     }
 
-    // TODO: Just for testing
-    pub unsafe fn as_ref(&self) -> &ffi::AVCodecParameters {
-        self.base
-    }
-
     pub fn codec_type(&self) -> AVMediaType {
         AVMediaType::from_i32(self.base.codec_type).unwrap_or(AVMediaType::Unknown)
     }
@@ -376,11 +352,6 @@ impl<'a> AVCodec<'a> {
         return AVCodec { base, phantom: PhantomData };
     }
 
-    // TODO: Just for testing
-    pub unsafe fn as_ref(&self) -> &ffi::AVCodec {
-        self.base
-    }
-
     pub fn name(self: &AVCodec<'a>) -> std::string::String {
         String::from(unsafe { std::ffi::CStr::from_ptr(self.base.name) }.to_str().unwrap())
     }
@@ -399,9 +370,18 @@ impl AVCodecContext {
         Ok(AVCodecContext { base })
     }
 
-    // TODO: Just for testing
-    pub unsafe fn raw(&self) -> *mut ffi::AVCodecContext {
-        self.base
+    pub fn in_packet(&mut self, packet: &mut AVPacket) -> Result<(), failure::Error> {
+        match unsafe { ffi::avcodec_send_packet(self.base, packet.base) } {
+            0 => Ok(()),
+            errno => Err(failure::format_err!("Error while loading paclet: {}", errno))
+        }
+    }
+
+    pub fn out_frame(&mut self, frame: &mut AVFrame) -> Result<(), failure::Error> {
+        match unsafe { ffi::avcodec_receive_frame(self.base, frame.base) } {
+            0 => Ok(()),
+            errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
+        }
     }
 
     pub fn skip_loop_filter(&self) -> Option<AVDiscard> {

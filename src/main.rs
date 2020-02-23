@@ -1,5 +1,3 @@
-use ffmpeg_dev::sys as ffi;
-
 pub(crate) mod ffmpeg_api;
 
 use crate::ffmpeg_api::enums::*;
@@ -63,17 +61,12 @@ fn main() -> Result<(), std::io::Error> {
 
             let mut scale_context = SwsContext::new();
 
-            //TODO: HERE BE DRAGONS
-            while unsafe { ffi::av_read_frame(avformat_context.raw(), packet.as_mut()) } >= 0 && i < 16 {
-                // TODO: END DRAGONS
-
+            while avformat_context.read_frame(&mut packet).is_ok() && i < 16 {
                 if packet.stream_index() == stream.index() {
-
-                    //TODO: HERE BE DRAGONS
-                    unsafe { ffi::avcodec_send_packet(codec_context.raw(), packet.as_mut()) };
-                    while unsafe { ffi::avcodec_receive_frame(codec_context.raw(), frame.as_mut()) } >= 0 {
-                        // TODO: END DRAGONS
-
+                    codec_context.in_packet(&mut packet).unwrap_or_else(|error| {
+                        panic!("Could not load packet: {:?}", error)
+                    });
+                    while codec_context.out_frame(&mut frame).is_ok() {
                         println!(
                             "Frame {}: {:?} @ {}",
                             frame.coded_picture_number(),
