@@ -1,10 +1,9 @@
 use ffmpeg_dev::sys as ffi;
-use enum_primitive::*;
-use std::collections::HashMap;
 
-mod ffmpeg_api;
+pub(crate) mod ffmpeg_api;
 
-use ffmpeg_api::*;
+use crate::ffmpeg_api::enums::*;
+use crate::ffmpeg_api::api::*;
 
 fn main() -> Result<(), std::io::Error> {
     let mut before = std::time::SystemTime::now();
@@ -31,35 +30,25 @@ fn main() -> Result<(), std::io::Error> {
             local_codec.name()
         );
 
-        // TODO: HERE BE DRAGONS
-
-        let output_frame = unsafe {
-            ffi::av_frame_alloc().as_mut()
-        }.expect("not null");
-
-        let num_bytes: usize = unsafe {
-            ffi::avpicture_get_size(ffi::AVPixelFormat_AV_PIX_FMT_RGB24, 160, 90) as usize
-        };
-
-        let output_frame_buffer = unsafe {
-            (ffi::av_malloc(num_bytes) as *mut u8).as_ref()
-        }.expect("not null");
-
-        unsafe {
-            ffi::avpicture_fill(
-                output_frame as *mut ffi::AVFrame as *mut ffi::AVPicture,
-                output_frame_buffer,
-                ffi::AVPixelFormat_AV_PIX_FMT_RGB24,
-                160,
-                90,
-            );
-        }
+        let mut output_frame = AVFrame::new().unwrap_or_else(|error| {
+            panic!("Could not create output frame: {:?}", error)
+        });
+        output_frame.init(160, 90, AVPixelFormat::RGB24).unwrap_or_else(|error| {
+            panic!("Could not init output frame: {:?}", error)
+        });
 
         match codec_parameters.codec_type() {
             AVMediaType::Video => {
+
+                // TODO: HERE BE DRAGONS
+
                 let avc_ctx: &mut ffi::AVCodecContext = unsafe {
                     ffi::avcodec_alloc_context3(local_codec.as_ref()).as_mut()
                 }.expect("not null");
+
+                avc_ctx.skip_loop_filter = ffi::AVDiscard_AVDISCARD_NONKEY;
+                avc_ctx.skip_idct = ffi::AVDiscard_AVDISCARD_NONKEY;
+                avc_ctx.skip_frame = ffi::AVDiscard_AVDISCARD_NONKEY;
 
                 unsafe {
                     ffi::avcodec_parameters_to_context(avc_ctx, codec_parameters.as_ref());
@@ -70,18 +59,16 @@ fn main() -> Result<(), std::io::Error> {
                     ffi::av_packet_alloc().as_mut()
                 }.expect("not null");
 
-                let frame: &mut ffi::AVFrame = unsafe {
-                    ffi::av_frame_alloc().as_mut()
-                }.expect("not null");
-
-                avc_ctx.skip_loop_filter = ffi::AVDiscard_AVDISCARD_NONKEY;
-                avc_ctx.skip_idct = ffi::AVDiscard_AVDISCARD_NONKEY;
-                avc_ctx.skip_frame = ffi::AVDiscard_AVDISCARD_NONKEY;
+                let mut frame = AVFrame::new().unwrap_or_else(|error| {
+                    panic!("Could not create input frame: {:?}", error)
+                });
 
                 let mut i = 0;
 
                 println!("Time: {:#?}", before.elapsed().unwrap());
                 before = std::time::SystemTime::now();
+
+                let mut sws_context: *mut ffi::SwsContext = std::ptr::null_mut();
 
                 while unsafe { ffi::av_read_frame(avformat_context.raw(), packet) } >= 0 && i < 10 {
                     if packet.stream_index == stream.index() {
@@ -89,64 +76,55 @@ fn main() -> Result<(), std::io::Error> {
                             ffi::avcodec_send_packet(avc_ctx, packet);
                         }
 
-                        while unsafe { ffi::avcodec_receive_frame(avc_ctx, frame) } >= 0 {
-                            let key_frame = frame.key_frame != 0;
-                            let frame_index = frame.coded_picture_number;
-
+                        while unsafe { ffi::avcodec_receive_frame(avc_ctx, frame.as_mut()) } >= 0 {
                             println!(
                                 "Frame {}: {:?} @ {}",
-                                frame_index,
-                                stream.timestamp(frame.pts as i64),
-                                key_frame
+                                frame.coded_picture_number(),
+                                stream.timestamp(frame.pts()),
+                                frame.key_frame()
                             );
                             println!("Reading Time: {:#?}", before.elapsed().unwrap());
                             before = std::time::SystemTime::now();
 
-
-                            /*
-                            if frame.width == last_width && frame.height == last_height && (frame.format as AVPixelFormat) == last_format {
-
+                            if sws_context.is_null() {
+                                sws_context = unsafe {
+                                    ffi::sws_getContext(
+                                        frame.width(),
+                                        frame.height(),
+                                        frame.format() as ffi::AVPixelFormat,
+                                        160,
+                                        90,
+                                        ffi::AVPixelFormat_AV_PIX_FMT_RGB24,
+                                        ffi::SWS_FAST_BILINEAR as i32,
+                                        std::ptr::null_mut(),
+                                        std::ptr::null_mut(),
+                                        std::ptr::null(),
+                                    ).as_mut()
+                                }.expect("not null");
                             }
-                            */
-                            let sws_context: &mut ffi::SwsContext = unsafe {
-                                ffi::sws_getContext(
-                                    frame.width,
-                                    frame.height,
-                                    frame.format as ffi::AVPixelFormat,
-                                    160,
-                                    90,
-                                    ffi::AVPixelFormat_AV_PIX_FMT_RGB24,
-                                    ffi::SWS_FAST_BILINEAR as i32,
-                                    std::ptr::null_mut(),
-                                    std::ptr::null_mut(),
-                                    std::ptr::null(),
-                                ).as_mut()
-                            }.expect("not null");
 
                             let success = unsafe {
                                 ffi::sws_scale(
                                     sws_context,
-                                    frame.data.as_ptr() as *const *const u8,
-                                    &frame.linesize[0],
+                                    frame.data_ptr(),
+                                    frame.linesize().as_ptr(),
                                     0,
-                                    frame.height,
-                                    &output_frame.data[0],
-                                    &output_frame.linesize[0],
+                                    frame.height(),
+                                    output_frame.data_mut_ptr(),
+                                    output_frame.linesize().as_ptr(),
                                 )
                             };
 
-                            println!("success: {}, size: {}", success, num_bytes);
+                            println!("success: {}", success);
                             println!("Processing Time: {:#?}", before.elapsed().unwrap());
                             before = std::time::SystemTime::now();
 
                             if success > 0 {
                                 image::save_buffer(
                                     format!("/home/janne/Workspace/justflix/data/test/image_{}.png", i),
-                                    unsafe {
-                                        std::slice::from_raw_parts(output_frame.data[0], num_bytes)
-                                    },
-                                    160,
-                                    90,
+                                    output_frame.data(0),
+                                    output_frame.width() as u32,
+                                    output_frame.height() as u32,
                                     image::ColorType::Rgb8,
                                 ).unwrap();
 
