@@ -60,7 +60,7 @@ impl<'a> AVFormatContext {
         }
             .iter()
             .map(|stream| {
-                AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), self)
+                AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
             })
             .collect();
     }
@@ -264,30 +264,30 @@ impl<'a> AVStream<'a> {
         )
     }
 
-    pub fn duration(self: &AVStream<'a>) -> std::time::Duration {
+    pub fn duration(&self) -> std::time::Duration {
         self.timestamp(self.base.duration)
     }
 
-    pub fn frame_count(self: &AVStream<'a>) -> i64 {
+    pub fn frame_count(&self) -> i64 {
         self.base.nb_frames
     }
 
-    pub fn discard(self: &AVStream<'a>) -> Option<AVDiscard> {
+    pub fn discard(&self) -> Option<AVDiscard> {
         AVDiscard::from_i32(self.base.discard)
     }
 
-    pub fn set_discard(self: &mut AVStream<'a>, value: AVDiscard) {
+    pub fn set_discard(&mut self, value: AVDiscard) {
         self.base.discard = value as ffi::AVDiscard;
     }
 
-    pub fn sample_aspect_ratio(self: &AVStream<'a>) -> Fraction {
+    pub fn sample_aspect_ratio(&self) -> Fraction {
         Fraction::new(
             self.base.sample_aspect_ratio.num as u32,
             self.base.sample_aspect_ratio.den as u32,
         )
     }
 
-    pub fn codec_parameters(self: &AVStream<'a>) -> AVCodecParameters {
+    pub fn codec_parameters(&self) -> AVCodecParameters {
         AVCodecParameters::new(unsafe { self.base.codecpar.as_mut() }.expect("not null"), self)
     }
 }
@@ -307,15 +307,15 @@ impl<'a> AVCodecParameters<'a> {
         self.base
     }
 
-    pub fn codec_type(self: &AVCodecParameters<'a>) -> AVMediaType {
+    pub fn codec_type(&self) -> AVMediaType {
         AVMediaType::from_i32(self.base.codec_type).unwrap_or(AVMediaType::Unknown)
     }
 
-    pub fn codec_id(self: &AVCodecParameters<'a>) -> Option<AVCodecID> {
+    pub fn codec_id(&self) -> Option<AVCodecID> {
         AVCodecID::from_u32(self.base.codec_id)
     }
 
-    pub fn find_decoder(self: &AVCodecParameters<'a>) -> AVCodec {
+    pub fn find_decoder(&self) -> AVCodec {
         AVCodec::new(
             unsafe { ffi::avcodec_find_decoder(self.base.codec_id).as_mut() }.expect("Decoder not found"),
             self,
@@ -340,5 +340,78 @@ impl<'a> AVCodec<'a> {
 
     pub fn name(self: &AVCodec<'a>) -> std::string::String {
         String::from(unsafe { std::ffi::CStr::from_ptr(self.base.name) }.to_str().unwrap())
+    }
+}
+
+pub struct AVCodecContext {
+    base: *mut ffi::AVCodecContext,
+}
+
+impl AVCodecContext {
+    pub fn new(codec: &AVCodec) -> Result<Self, failure::Error> {
+        let base = unsafe { ffi::avcodec_alloc_context3(codec.base) };
+        if base.is_null() {
+            bail!("avcodec_alloc_context3() failed");
+        }
+        Ok(AVCodecContext { base })
+    }
+
+    // TODO: Just for testing
+    pub unsafe fn raw(&self) -> *mut ffi::AVCodecContext {
+        self.base
+    }
+
+    pub fn skip_loop_filter(&self) -> Option<AVDiscard> {
+        let base = unsafe { self.base.as_ref() }.expect("not null");
+
+        AVDiscard::from_i32(base.skip_loop_filter)
+    }
+
+    pub fn set_skip_loop_filter(&mut self, value: AVDiscard) {
+        let base = unsafe { self.base.as_mut() }.expect("not null");
+
+        base.skip_loop_filter = value as ffi::AVDiscard
+    }
+
+    pub fn skip_idct(&self) -> Option<AVDiscard> {
+        let base = unsafe { self.base.as_ref() }.expect("not null");
+
+        AVDiscard::from_i32(base.skip_idct)
+    }
+
+    pub fn set_skip_idct(&mut self, value: AVDiscard) {
+        let base = unsafe { self.base.as_mut() }.expect("not null");
+
+        base.skip_idct = value as ffi::AVDiscard
+    }
+
+    pub fn skip_frame(&self) -> Option<AVDiscard> {
+        let base = unsafe { self.base.as_ref() }.expect("not null");
+
+        AVDiscard::from_i32(base.skip_frame)
+    }
+
+    pub fn set_skip_frame(&mut self, value: AVDiscard) {
+        let base = unsafe { self.base.as_mut() }.expect("not null");
+
+        base.skip_frame = value as ffi::AVDiscard
+    }
+
+    pub fn set_parameters(&mut self, params: &AVCodecParameters) {
+        unsafe {
+            ffi::avcodec_parameters_to_context(self.base, params.base);
+        }
+    }
+
+    pub fn open(&mut self, codec: &AVCodec) {
+        unsafe {
+            ffi::avcodec_open2(self.base, codec.base, std::ptr::null_mut());
+        }
+    }
+}
+
+impl Drop for AVCodecContext {
+    fn drop(&mut self) {
+        unsafe { ffi::avcodec_free_context(&mut self.base) }
     }
 }

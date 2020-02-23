@@ -37,107 +37,98 @@ fn main() -> Result<(), std::io::Error> {
             panic!("Could not init output frame: {:?}", error)
         });
 
-        match codec_parameters.codec_type() {
-            AVMediaType::Video => {
+        if codec_parameters.codec_type() == AVMediaType::Video {
+            let mut codec_context = AVCodecContext::new(&local_codec).unwrap_or_else(|error| {
+                panic!("Could not init codec context: {:?}", error)
+            });
+            codec_context.set_parameters(&codec_parameters);
+            codec_context.open(&local_codec);
 
-                // TODO: HERE BE DRAGONS
+            codec_context.set_skip_loop_filter(AVDiscard::NonKey);
+            codec_context.set_skip_idct(AVDiscard::NonKey);
+            codec_context.set_skip_frame(AVDiscard::NonKey);
 
-                let avc_ctx: &mut ffi::AVCodecContext = unsafe {
-                    ffi::avcodec_alloc_context3(local_codec.as_ref()).as_mut()
-                }.expect("not null");
+            // TODO: HERE BE DRAGONS
+            let packet: &mut ffi::AVPacket = unsafe {
+                ffi::av_packet_alloc().as_mut()
+            }.expect("not null");
+            // TODO: END DRAGONS
 
-                avc_ctx.skip_loop_filter = ffi::AVDiscard_AVDISCARD_NONKEY;
-                avc_ctx.skip_idct = ffi::AVDiscard_AVDISCARD_NONKEY;
-                avc_ctx.skip_frame = ffi::AVDiscard_AVDISCARD_NONKEY;
+            let mut frame = AVFrame::new().unwrap_or_else(|error| {
+                panic!("Could not create input frame: {:?}", error)
+            });
 
-                unsafe {
-                    ffi::avcodec_parameters_to_context(avc_ctx, codec_parameters.as_ref());
-                    ffi::avcodec_open2(avc_ctx, local_codec.as_ref(), std::ptr::null_mut());
-                }
+            let mut i = 0;
 
-                let packet: &mut ffi::AVPacket = unsafe {
-                    ffi::av_packet_alloc().as_mut()
-                }.expect("not null");
+            println!("Time: {:#?}", before.elapsed().unwrap());
+            before = std::time::SystemTime::now();
 
-                let mut frame = AVFrame::new().unwrap_or_else(|error| {
-                    panic!("Could not create input frame: {:?}", error)
-                });
+            //TODO: HERE BE DRAGONS
+            while unsafe { ffi::av_read_frame(avformat_context.raw(), packet) } >= 0 && i < 10 {
+                if packet.stream_index == stream.index() {
+                    unsafe { ffi::avcodec_send_packet(codec_context.raw(), packet) };
+                    while unsafe { ffi::avcodec_receive_frame(codec_context.raw(), frame.as_mut()) } >= 0 {
+                        // TODO: END DRAGONS
 
-                let mut i = 0;
+                        println!(
+                            "Frame {}: {:?} @ {}",
+                            frame.coded_picture_number(),
+                            stream.timestamp(frame.pts()),
+                            frame.key_frame()
+                        );
+                        println!("Reading Time: {:#?}", before.elapsed().unwrap());
+                        before = std::time::SystemTime::now();
 
-                println!("Time: {:#?}", before.elapsed().unwrap());
-                before = std::time::SystemTime::now();
+                        // TODO: HERE BE DRAGONS
+                        let sws_context = unsafe {
+                            ffi::sws_getContext(
+                                frame.width(),
+                                frame.height(),
+                                frame.format() as ffi::AVPixelFormat,
+                                output_frame.width(),
+                                output_frame.height(),
+                                output_frame.format() as ffi::AVPixelFormat,
+                                ffi::SWS_FAST_BILINEAR as i32,
+                                std::ptr::null_mut(),
+                                std::ptr::null_mut(),
+                                std::ptr::null(),
+                            ).as_mut()
+                        }.expect("not null");
 
-                let mut sws_context: *mut ffi::SwsContext = std::ptr::null_mut();
+                        let success = unsafe {
+                            ffi::sws_scale(
+                                sws_context,
+                                frame.data_ptr(),
+                                frame.linesize().as_ptr(),
+                                0,
+                                frame.height(),
+                                output_frame.data_mut_ptr(),
+                                output_frame.linesize().as_ptr(),
+                            )
+                        };
+                        // TODO: END DRAGONS
 
-                while unsafe { ffi::av_read_frame(avformat_context.raw(), packet) } >= 0 && i < 10 {
-                    if packet.stream_index == stream.index() {
-                        unsafe {
-                            ffi::avcodec_send_packet(avc_ctx, packet);
+                        println!("success: {}", success);
+                        println!("Processing Time: {:#?}", before.elapsed().unwrap());
+                        before = std::time::SystemTime::now();
+
+                        if success > 0 {
+                            image::save_buffer(
+                                format!("/home/janne/Workspace/justflix/data/test/image_{}.png", i),
+                                output_frame.data(0),
+                                output_frame.width() as u32,
+                                output_frame.height() as u32,
+                                image::ColorType::Rgb8,
+                            ).unwrap();
+
+                            i += 1;
                         }
 
-                        while unsafe { ffi::avcodec_receive_frame(avc_ctx, frame.as_mut()) } >= 0 {
-                            println!(
-                                "Frame {}: {:?} @ {}",
-                                frame.coded_picture_number(),
-                                stream.timestamp(frame.pts()),
-                                frame.key_frame()
-                            );
-                            println!("Reading Time: {:#?}", before.elapsed().unwrap());
-                            before = std::time::SystemTime::now();
-
-                            if sws_context.is_null() {
-                                sws_context = unsafe {
-                                    ffi::sws_getContext(
-                                        frame.width(),
-                                        frame.height(),
-                                        frame.format() as ffi::AVPixelFormat,
-                                        160,
-                                        90,
-                                        ffi::AVPixelFormat_AV_PIX_FMT_RGB24,
-                                        ffi::SWS_FAST_BILINEAR as i32,
-                                        std::ptr::null_mut(),
-                                        std::ptr::null_mut(),
-                                        std::ptr::null(),
-                                    ).as_mut()
-                                }.expect("not null");
-                            }
-
-                            let success = unsafe {
-                                ffi::sws_scale(
-                                    sws_context,
-                                    frame.data_ptr(),
-                                    frame.linesize().as_ptr(),
-                                    0,
-                                    frame.height(),
-                                    output_frame.data_mut_ptr(),
-                                    output_frame.linesize().as_ptr(),
-                                )
-                            };
-
-                            println!("success: {}", success);
-                            println!("Processing Time: {:#?}", before.elapsed().unwrap());
-                            before = std::time::SystemTime::now();
-
-                            if success > 0 {
-                                image::save_buffer(
-                                    format!("/home/janne/Workspace/justflix/data/test/image_{}.png", i),
-                                    output_frame.data(0),
-                                    output_frame.width() as u32,
-                                    output_frame.height() as u32,
-                                    image::ColorType::Rgb8,
-                                ).unwrap();
-
-                                i += 1;
-                            }
-
-                            println!("Writing Time: {:#?}", before.elapsed().unwrap());
-                            before = std::time::SystemTime::now();
-                        }
+                        println!("Writing Time: {:#?}", before.elapsed().unwrap());
+                        before = std::time::SystemTime::now();
                     }
                 }
             }
-            _ => {}
         }
     }
 
