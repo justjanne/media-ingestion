@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use fraction::Fraction;
 
 use crate::ffmpeg_api::enums::*;
+use crate::media_time;
 
 pub struct AVFormatContext {
     base: *mut ffi::AVFormatContext,
@@ -62,7 +63,7 @@ impl<'a> AVFormatContext {
         }).find(predicate)
     }
 
-    pub fn read_frame(&/*TODO:mut*/ self, packet: &mut AVPacket) -> Result<(), failure::Error> {
+    pub fn read_frame(&self, packet: &mut AVPacket) -> Result<(), failure::Error> {
         match unsafe { ffi::av_read_frame(self.base, packet.base) } {
             0 => Ok(()),
             errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
@@ -292,16 +293,11 @@ impl<'a> AVStream<'a> {
         )
     }
 
-    pub fn timestamp(self: &AVStream<'a>, timestamp: i64) -> std::time::Duration {
-        std::time::Duration::from_millis(
-            1000 *
-                timestamp as u64 *
-                self.base.time_base.num as u64 /
-                self.base.time_base.den as u64
-        )
+    pub fn timestamp(self: &AVStream<'a>, timestamp: i64) -> media_time::MediaTime {
+        media_time::MediaTime::from_rational(timestamp, self.time_base())
     }
 
-    pub fn duration(&self) -> std::time::Duration {
+    pub fn duration(&self) -> media_time::MediaTime {
         self.timestamp(self.base.duration)
     }
 
@@ -321,6 +317,13 @@ impl<'a> AVStream<'a> {
         Fraction::new(
             self.base.sample_aspect_ratio.num as u32,
             self.base.sample_aspect_ratio.den as u32,
+        )
+    }
+
+    pub fn display_aspect_ratio(&self) -> Fraction {
+        Fraction::new(
+            self.base.display_aspect_ratio.num as u32,
+            self.base.display_aspect_ratio.den as u32,
         )
     }
 
