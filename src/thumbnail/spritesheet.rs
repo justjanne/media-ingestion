@@ -111,12 +111,12 @@ impl SpritesheetManager {
             self.end_frame(timestamp);
         }
 
+        if self.sprite_index(self.current_image + 1) == 0 {
+            self.save_spritesheet()?;
+        }
+
         self.last_timestamp = timestamp;
         self.current_image += 1;
-
-        if self.sprite_index(self.current_image) == 0 {
-            self.save()?;
-        }
 
         Ok(())
     }
@@ -138,7 +138,7 @@ impl SpritesheetManager {
 
     fn save_spritesheet(&mut self) -> Result<(), failure::Error> {
         self.spritesheet.save(
-            format!("{}/spritesheet_{}.png", self.output_path, self.spritesheet_index(self.current_image))
+            format!("{}/spritesheet_{}.jpg", self.output_path, self.spritesheet_index(self.current_image))
         ).map_err(|error| {
             format_err!("Could not write spritesheet: {}", error)
         })?;
@@ -148,7 +148,7 @@ impl SpritesheetManager {
 
     pub fn save(&mut self) -> Result<(), failure::Error> {
         self.save_spritesheet()?;
-        self.metadata.save(format!("{}/spritesheet.vtt", self.output_path)).map_err(|error| {
+        self.metadata.save(format!("{}/spritesheets.vtt", self.output_path)).map_err(|error| {
             format_err!("Could not write spritesheet metadata: {}", error)
         })?;
         Ok(())
