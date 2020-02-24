@@ -24,6 +24,10 @@ impl MediaTime {
     pub fn from_seconds(timestamp: i64) -> MediaTime {
         MediaTime(time::Duration::seconds(timestamp))
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
 }
 
 impl std::fmt::Display for MediaTime {

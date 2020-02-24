@@ -85,7 +85,7 @@ impl SpritesheetManager {
     }
 
     pub fn fulfils_frame_interval(&self, timestamp: MediaTime) -> bool {
-        timestamp - self.last_timestamp > self.frame_interval
+        self.current_image == 0 || timestamp - self.last_timestamp > self.frame_interval
     }
 
     pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) {
