@@ -1,7 +1,8 @@
-use crate::media_time::MediaTime;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::LineWriter;
+
+use crate::util::media_time::MediaTime;
 
 pub struct WebVTTFile {
     cues: Vec<WebVTTCue>

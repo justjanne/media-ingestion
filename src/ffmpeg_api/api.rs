@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use fraction::Fraction;
 
 use crate::ffmpeg_api::enums::*;
-use crate::media_time;
+use crate::util::media_time;
 
 pub struct AVFormatContext {
     base: *mut ffi::AVFormatContext,
@@ -293,11 +293,11 @@ impl<'a> AVStream<'a> {
         )
     }
 
-    pub fn timestamp(self: &AVStream<'a>, timestamp: i64) -> media_time::MediaTime {
+    pub fn timestamp(self: &AVStream<'a>, timestamp: i64) -> Result<media_time::MediaTime, failure::Error> {
         media_time::MediaTime::from_rational(timestamp, self.time_base())
     }
 
-    pub fn duration(&self) -> media_time::MediaTime {
+    pub fn duration(&self) -> Result<media_time::MediaTime, failure::Error> {
         self.timestamp(self.base.duration)
     }
 

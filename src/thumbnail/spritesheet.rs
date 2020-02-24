@@ -1,6 +1,8 @@
 use image::{RgbImage, ImageBuffer};
-use crate::media_time::MediaTime;
-use crate::webvtt::{WebVTTFile, WebVTTCue};
+use failure::{bail, format_err};
+
+use crate::util::media_time::MediaTime;
+use crate::util::webvtt::{WebVTTFile, WebVTTCue};
 
 pub struct SpritesheetManager {
     num_horizontal: u32,
@@ -88,9 +90,9 @@ impl SpritesheetManager {
         self.current_image == 0 || timestamp - self.last_timestamp > self.frame_interval
     }
 
-    pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) {
+    pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) -> Result<(), failure::Error> {
         if image.width() != self.sprite_width || image.height() != self.sprite_height {
-            panic!(
+            bail!(
                 "Wrong image size: {}x{}, but expected {}x{}",
                 image.width(), image.height(),
                 self.sprite_width, self.sprite_height
@@ -113,8 +115,10 @@ impl SpritesheetManager {
         self.current_image += 1;
 
         if self.sprite_index(self.current_image) == 0 {
-            self.save();
+            self.save()?;
         }
+
+        Ok(())
     }
 
     pub fn end_frame(&mut self, timestamp: MediaTime) {
@@ -132,19 +136,21 @@ impl SpritesheetManager {
         ));
     }
 
-    fn save_spritesheet(&mut self) {
+    fn save_spritesheet(&mut self) -> Result<(), failure::Error> {
         self.spritesheet.save(
             format!("{}/spritesheet_{}.png", self.output_path, self.spritesheet_index(self.current_image))
-        ).unwrap_or_else(|error| {
-            panic!("Could not write spritesheet: {}", error)
-        });
+        ).map_err(|error| {
+            format_err!("Could not write spritesheet: {}", error)
+        })?;
         self.reinit_buffer();
+        Ok(())
     }
 
-    pub fn save(&mut self) {
-        self.save_spritesheet();
-        self.metadata.save(format!("{}/spritesheet.vtt", self.output_path)).unwrap_or_else(|error| {
-            panic!("Could not write spritesheet metadata: {}", error)
-        });
+    pub fn save(&mut self) -> Result<(), failure::Error> {
+        self.save_spritesheet()?;
+        self.metadata.save(format!("{}/spritesheet.vtt", self.output_path)).map_err(|error| {
+            format_err!("Could not write spritesheet metadata: {}", error)
+        })?;
+        Ok(())
     }
 }
