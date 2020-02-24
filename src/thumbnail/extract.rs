@@ -23,7 +23,8 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
         max_size,
         num_horizontal, num_vertical,
         frame_interval,
-        output_folder,
+        &output_folder,
+        "preview"
     );
 
     let mut stream: AVStream = avformat_context.find_stream(|stream| {
