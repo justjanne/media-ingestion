@@ -1,6 +1,6 @@
 use fraction::Fraction;
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct MediaTime(time::Duration);
 
 impl MediaTime {
@@ -39,5 +39,21 @@ impl std::fmt::Display for MediaTime {
         } else {
             write!(f, "{:02}:{:02}:{:02}.{:03}", h, m, s, z)
         }
+    }
+}
+
+impl std::ops::Add for MediaTime {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+impl std::ops::Sub for MediaTime {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
     }
 }

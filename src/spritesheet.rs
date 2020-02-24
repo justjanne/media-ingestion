@@ -11,13 +11,14 @@ pub struct SpritesheetManager {
     spritesheet: RgbImage,
     current_image: u32,
     last_timestamp: MediaTime,
+    frame_interval: MediaTime,
     metadata: WebVTTFile,
     output_path: std::string::String,
     initialized: bool,
 }
 
 impl SpritesheetManager {
-    pub fn new<T: AsRef<str>>(max_side: u32, num_horizontal: u32, num_vertical: u32, output_path: T) -> SpritesheetManager {
+    pub fn new<T: AsRef<str>>(max_side: u32, num_horizontal: u32, num_vertical: u32, frame_interval: MediaTime, output_path: T) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,
             num_vertical,
@@ -27,6 +28,7 @@ impl SpritesheetManager {
             spritesheet: ImageBuffer::new(0, 0),
             current_image: 0,
             last_timestamp: MediaTime::from_millis(0),
+            frame_interval,
             metadata: WebVTTFile::new(),
             output_path: std::string::String::from(output_path.as_ref()),
             initialized: false,
@@ -80,6 +82,10 @@ impl SpritesheetManager {
     fn y(&self, current: u32) -> u32 {
         let index = (current / self.num_horizontal) % self.num_vertical;
         index * self.sprite_height
+    }
+
+    pub fn fulfils_frame_interval(&self, timestamp: MediaTime) -> bool {
+        timestamp - self.last_timestamp > self.frame_interval
     }
 
     pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) {

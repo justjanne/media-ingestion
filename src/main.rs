@@ -7,7 +7,7 @@ pub(crate) mod spritesheet;
 
 use crate::ffmpeg_api::enums::*;
 use crate::ffmpeg_api::api::*;
-use image::{ImageBuffer};
+use crate::media_time::MediaTime;
 
 fn main() -> Result<(), std::io::Error> {
     let mut before = std::time::SystemTime::now();
@@ -25,6 +25,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
         160,
         5, 5,
+        MediaTime::from_seconds(10),
         output,
     );
 
@@ -89,42 +90,44 @@ fn main() -> Result<(), std::io::Error> {
                     println!("Reading Time: {:#?}", before.elapsed().unwrap());
                     before = std::time::SystemTime::now();
 
-                    if !spritesheet_manager.initialized() {
-                        spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32);
-                        output_frame.init(
-                            spritesheet_manager.sprite_width() as i32,
-                            spritesheet_manager.sprite_height() as i32,
-                            AVPixelFormat::RGB24,
-                        ).unwrap_or_else(|error| {
-                            panic!("Could not init output frame: {:?}", error)
-                        });
-                        scale_context.reinit(
-                            &frame,
-                            &output_frame,
-                            SwsScaler::FastBilinear,
-                        ).unwrap_or_else(|error| {
-                            panic!("Could not reinit scale context: {:?}", error)
-                        });
+                    if spritesheet_manager.fulfils_frame_interval(stream.timestamp(frame.pts())) {
+                        if !spritesheet_manager.initialized() {
+                            spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32);
+                            output_frame.init(
+                                spritesheet_manager.sprite_width() as i32,
+                                spritesheet_manager.sprite_height() as i32,
+                                AVPixelFormat::RGB24,
+                            ).unwrap_or_else(|error| {
+                                panic!("Could not init output frame: {:?}", error)
+                            });
+                            scale_context.reinit(
+                                &frame,
+                                &output_frame,
+                                SwsScaler::FastBilinear,
+                            ).unwrap_or_else(|error| {
+                                panic!("Could not reinit scale context: {:?}", error)
+                            });
+                        }
+
+                        scale_context.scale(&frame, &mut output_frame);
+
+                        println!("Processing Time: {:#?}", before.elapsed().unwrap());
+                        before = std::time::SystemTime::now();
+
+                        spritesheet_manager.add_image(
+                            stream.timestamp(frame.pts()),
+                            image::ImageBuffer::from_raw(
+                                output_frame.width() as u32,
+                                output_frame.height() as u32,
+                                output_frame.data(0).to_vec(),
+                            ).unwrap_or_else(|| {
+                                panic!("Could not process frame")
+                            }),
+                        );
+
+                        println!("Writing Time: {:#?}", before.elapsed().unwrap());
+                        before = std::time::SystemTime::now();
                     }
-
-                    scale_context.scale(&frame, &mut output_frame);
-
-                    println!("Processing Time: {:#?}", before.elapsed().unwrap());
-                    before = std::time::SystemTime::now();
-
-                    spritesheet_manager.add_image(
-                        stream.timestamp(frame.pts()),
-                        ImageBuffer::from_raw(
-                            output_frame.width() as u32,
-                            output_frame.height() as u32,
-                            output_frame.data(0).to_vec(),
-                        ).unwrap_or_else(|| {
-                            panic!("Could not process frame")
-                        }),
-                    );
-
-                    println!("Writing Time: {:#?}", before.elapsed().unwrap());
-                    before = std::time::SystemTime::now();
                 }
             }
         }
