@@ -45,7 +45,7 @@ impl<'a> AVFormatContext {
                 )
             }
         ).iter().map(|stream| {
-            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
+            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"))
         }).collect()
     }
 
@@ -59,11 +59,11 @@ impl<'a> AVFormatContext {
                 )
             }
         ).iter().map(|stream| {
-            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"), &self)
+            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"))
         }).find(predicate)
     }
 
-    pub fn read_frame(&self, packet: &mut AVPacket) -> Result<(), failure::Error> {
+    pub fn read_frame(&mut self, packet: &mut AVPacket) -> Result<(), failure::Error> {
         match unsafe { ffi::av_read_frame(self.base, packet.base) } {
             0 => Ok(()),
             errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
@@ -273,13 +273,12 @@ impl Drop for AVFrame {
 }
 
 pub struct AVStream<'a> {
-    base: &'a mut ffi::AVStream,
-    phantom: PhantomData<&'a AVFormatContext>,
+    base: &'a mut ffi::AVStream
 }
 
 impl<'a> AVStream<'a> {
-    fn new(base: &'a mut ffi::AVStream, _: &'a AVFormatContext) -> Self {
-        return AVStream { base, phantom: PhantomData };
+    fn new(base: &'a mut ffi::AVStream) -> Self {
+        return AVStream { base };
     }
 
     pub fn index(self: &AVStream<'a>) -> i32 {

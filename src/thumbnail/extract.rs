@@ -32,15 +32,18 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
     }).ok_or_else(|| {
         format_err!("Could not find video stream")
     })?;
-
     stream.set_discard(AVDiscard::NonKey);
+
+    let index = stream.index();
+    let time_base = stream.time_base();
+    let duration = stream.duration()?;
 
     let codec_parameters = stream.codec_parameters();
     let local_codec = codec_parameters.find_decoder();
 
     println!(
         "Stream #{}, type: {:#?}, codec: {:#?}",
-        stream.index(),
+        index,
         codec_parameters.codec_type(),
         local_codec.name()
     );
@@ -71,19 +74,21 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
         let mut scale_context = SwsContext::new();
 
         while avformat_context.read_frame(&mut packet).is_ok() {
-            if packet.stream_index() == stream.index() {
+            if packet.stream_index() == index {
                 codec_context.in_packet(&mut packet).map_err(|error| {
                     format_err!("Could not load packet: {:?}", error)
                 })?;
                 while codec_context.out_frame(&mut frame).is_ok() {
+                    let timestamp = MediaTime::from_rational(frame.pts(), time_base)?;
+
                     println!(
                         "Frame {}: {} @ {}",
                         frame.coded_picture_number(),
-                        stream.timestamp(frame.pts())?,
+                        timestamp,
                         frame.key_frame()
                     );
 
-                    if spritesheet_manager.fulfils_frame_interval(stream.timestamp(frame.pts())?) {
+                    if spritesheet_manager.fulfils_frame_interval(timestamp) {
                         if !spritesheet_manager.initialized() {
                             spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32);
                             output_frame.init(
@@ -105,7 +110,7 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
                         scale_context.scale(&frame, &mut output_frame);
 
                         spritesheet_manager.add_image(
-                            stream.timestamp(frame.pts())?,
+                            timestamp,
                             image::ImageBuffer::from_raw(
                                 output_frame.width() as u32,
                                 output_frame.height() as u32,
@@ -119,7 +124,7 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
             }
         }
 
-        spritesheet_manager.end_frame(stream.duration()?);
+        spritesheet_manager.end_frame(duration);
         spritesheet_manager.save()?;
     }
 
