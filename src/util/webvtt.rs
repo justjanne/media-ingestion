@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::LineWriter;
+use std::path::Path;
+use std::string::String;
 
 use crate::util::media_time::MediaTime;
 
@@ -11,7 +13,7 @@ pub struct WebVTTFile {
 pub struct WebVTTCue {
     start: MediaTime,
     end: MediaTime,
-    payload: std::string::String,
+    payload: String,
 }
 
 impl WebVTTFile {
@@ -25,7 +27,7 @@ impl WebVTTFile {
         self.cues.push(cue);
     }
 
-    pub fn save(&self, path: std::string::String) -> Result<(), std::io::Error> {
+    pub fn save<T: AsRef<Path>>(&self, path: T) -> Result<(), std::io::Error> {
         let file = File::create(path)?;
         let mut file = LineWriter::new(file);
         file.write_all(b"WEBVTT\n\n")?;
@@ -38,7 +40,7 @@ impl WebVTTFile {
 }
 
 impl WebVTTCue {
-    pub fn new(start: MediaTime, end: MediaTime, payload: std::string::String) -> WebVTTCue {
+    pub fn new(start: MediaTime, end: MediaTime, payload: String) -> WebVTTCue {
         WebVTTCue { start, end, payload }
     }
 

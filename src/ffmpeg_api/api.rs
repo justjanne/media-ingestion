@@ -1,11 +1,13 @@
-use ffmpeg_dev::sys as ffi;
-use failure::bail;
-use enum_primitive::*;
 use std::marker::PhantomData;
+
+use enum_primitive::*;
+use failure::bail;
+use ffmpeg_dev::sys as ffi;
 use fraction::Fraction;
 
 use crate::ffmpeg_api::enums::*;
 use crate::util::media_time;
+use std::path::Path;
 
 pub struct AVFormatContext {
     base: *mut ffi::AVFormatContext,
@@ -20,13 +22,16 @@ impl<'a> AVFormatContext {
         Ok(AVFormatContext { base })
     }
 
-    pub fn open_input(&mut self, path: &str) -> Result<(), failure::Error> {
+    pub fn open_input(&mut self, path: &Path) -> Result<(), failure::Error> {
+        let path = path.to_str()
+            .ok_or_else(|| failure::format_err!("Could not convert path to c string"))?;
+        let path = std::ffi::CString::new(path)
+            .map_err(|_| failure::format_err!("Could not convert path to c string"))?;
+
         match unsafe {
             ffi::avformat_open_input(
                 &mut self.base,
-                std::ffi::CString::new(path)
-                    .map_err(|_| failure::format_err!("Could not convert path to c string"))?
-                    .as_ptr(),
+                path.as_ptr(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
             )
@@ -34,6 +39,10 @@ impl<'a> AVFormatContext {
             0 => Ok(()),
             _ => bail!("Could not open input")
         }
+    }
+
+    pub fn input_format(&self) -> AVInputFormat {
+        AVInputFormat::new(unsafe { (*self.base).iformat.as_mut() }.expect("not null"))
     }
 
     pub fn streams(&self) -> Vec<AVStream> {
@@ -69,11 +78,103 @@ impl<'a> AVFormatContext {
             errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
         }
     }
+
+    pub fn duration(&self) -> Result<media_time::MediaTime, failure::Error> {
+        media_time::MediaTime::from_rational(
+            unsafe { (*self.base).duration }, Fraction::new(
+                1 as u64,
+                ffi::AV_TIME_BASE as u64,
+            ),
+        )
+    }
 }
 
 impl Drop for AVFormatContext {
     fn drop(&mut self) {
         unsafe { ffi::avformat_free_context(self.base) }
+    }
+}
+
+pub struct AVInputFormat<'a> {
+    base: &'a mut ffi::AVInputFormat
+}
+
+impl<'a> AVInputFormat<'a> {
+    fn new(base: &'a mut ffi::AVInputFormat) -> Self {
+        return AVInputFormat { base };
+    }
+
+    pub fn long_name(&self) -> Result<String, failure::Error> {
+        let raw: *const ::std::os::raw::c_char = self.base.long_name;
+
+        if raw.is_null() {
+            Err(failure::format_err!("No mime type found"))
+        } else {
+            Ok(String::from(unsafe {
+                std::ffi::CStr::from_ptr(raw)
+            }.to_str().map_err(|err| {
+                failure::format_err!("Could not convert mime type to string: {}", err)
+            })?))
+        }
+    }
+
+    pub fn name(&self) -> Result<String, failure::Error> {
+        let raw: *const ::std::os::raw::c_char = self.base.name;
+
+        if raw.is_null() {
+            Err(failure::format_err!("No mime type found"))
+        } else {
+            Ok(String::from(unsafe {
+                std::ffi::CStr::from_ptr(raw)
+            }.to_str().map_err(|err| {
+                failure::format_err!("Could not convert mime type to string: {}", err)
+            })?))
+        }
+    }
+
+    pub fn mime(&self) -> Result<String, failure::Error> {
+        let raw: *const ::std::os::raw::c_char = self.base.mime_type;
+
+        if raw.is_null() {
+            Err(failure::format_err!("No mime type found"))
+        } else {
+            Ok(String::from(unsafe {
+                std::ffi::CStr::from_ptr(raw)
+            }.to_str().map_err(|err| {
+                failure::format_err!("Could not convert mime type to string: {}", err)
+            })?))
+        }
+    }
+
+    pub fn determine_mime<T: AsRef<str>>(&self, stream_codec: T) -> Result<String, failure::Error> {
+        let containers = self.name()?;
+        let stream_codec = stream_codec.as_ref();
+
+        for container in containers.split(",") {
+            match container {
+                "mp4" => match stream_codec {
+                    "h264" => {
+                        return Ok(String::from("video/mp4"));
+                    }
+                    _ => {
+                        // Do nothing
+                    }
+                }
+                "webm" => match stream_codec {
+                    "vp8" | "vp9" | "av1" => {
+                        return Ok(String::from("video/webm"));
+                    }
+                    _ => {
+                        // Do nothing
+                    }
+                }
+                _ => {
+                    // Do nothing
+                }
+            }
+        }
+
+        return Err(failure::format_err!("Could not determine mime type: {} video in {} container", stream_codec, containers));
     }
 }
 
@@ -347,6 +448,10 @@ impl<'a> AVCodecParameters<'a> {
 
     pub fn codec_id(&self) -> Option<AVCodecID> {
         AVCodecID::from_u32(self.base.codec_id)
+    }
+
+    pub fn bit_rate(&self) -> i64 {
+        self.base.bit_rate
     }
 
     pub fn find_decoder(&self) -> AVCodec {

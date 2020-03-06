@@ -14,20 +14,28 @@ impl MediaTime {
         })?;
 
         Ok(MediaTime(time::Duration::milliseconds(
-            1000 * timestamp * num as i64 / den as i64
+            (1000 * timestamp as i128 * num as i128 / den as i128) as i64
         )))
     }
 
+    #[inline(always)]
     pub fn from_millis(timestamp: i64) -> MediaTime {
         MediaTime(time::Duration::milliseconds(timestamp))
     }
 
+    #[inline(always)]
     pub fn from_seconds(timestamp: i64) -> MediaTime {
         MediaTime(time::Duration::seconds(timestamp))
     }
 
+    #[inline(always)]
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
+    }
+
+    #[inline(always)]
+    pub fn seconds(&self) -> i64 {
+        self.0.whole_seconds()
     }
 }
 

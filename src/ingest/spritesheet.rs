@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use image::{RgbImage, ImageBuffer};
 use failure::{bail, format_err};
 
@@ -15,13 +17,13 @@ pub struct SpritesheetManager {
     last_timestamp: MediaTime,
     frame_interval: MediaTime,
     metadata: WebVTTFile,
-    output_path: std::string::String,
+    output_path: PathBuf,
     name: std::string::String,
     initialized: bool,
 }
 
 impl SpritesheetManager {
-    pub fn new<T: AsRef<str>, U: AsRef<str>>(max_side: u32, num_horizontal: u32, num_vertical: u32, frame_interval: MediaTime, output_path: T, name: U) -> SpritesheetManager {
+    pub fn new<T: AsRef<str>, U: Into<PathBuf>>(max_side: u32, num_horizontal: u32, num_vertical: u32, frame_interval: MediaTime, output_path: U, name: T) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,
             num_vertical,
@@ -33,7 +35,7 @@ impl SpritesheetManager {
             last_timestamp: MediaTime::from_millis(0),
             frame_interval,
             metadata: WebVTTFile::new(),
-            output_path: std::string::String::from(output_path.as_ref()),
+            output_path: output_path.into(),
             name: std::string::String::from(name.as_ref()),
             initialized: false,
         }
@@ -141,7 +143,7 @@ impl SpritesheetManager {
 
     fn save_spritesheet(&mut self) -> Result<(), failure::Error> {
         self.spritesheet.save(
-            format!("{}/{}_{}.jpg", self.output_path, self.name, self.spritesheet_index(self.current_image))
+            self.output_path.join(format!("{}_{}.jpg", self.name, self.spritesheet_index(self.current_image)))
         ).map_err(|error| {
             format_err!("Could not write spritesheet: {}", error)
         })?;
@@ -151,7 +153,9 @@ impl SpritesheetManager {
 
     pub fn save(&mut self) -> Result<(), failure::Error> {
         self.save_spritesheet()?;
-        self.metadata.save(format!("{}/{}.vtt", self.output_path, self.name)).map_err(|error| {
+        self.metadata.save(
+            self.output_path.join(format!("{}.vtt", self.name))
+        ).map_err(|error| {
             format_err!("Could not write spritesheet metadata: {}", error)
         })?;
         Ok(())

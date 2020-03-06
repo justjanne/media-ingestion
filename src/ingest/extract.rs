@@ -1,29 +1,34 @@
+use std::path::Path;
+use failure::format_err;
+
 use crate::ffmpeg_api::api::*;
 use crate::ffmpeg_api::enums::*;
 use crate::util::media_time::*;
-use crate::thumbnail::spritesheet::*;
+use crate::ingest::spritesheet::*;
+use crate::util::stream_metadata::*;
 
-use failure::format_err;
-
-pub fn extract<T: AsRef<str>, U: AsRef<str>>(
+pub fn extract(
     max_size: u32,
     num_horizontal: u32, num_vertical: u32,
     frame_interval: MediaTime,
-    input_file: T,
-    output_folder: U,
+    input_file: &Path,
+    output_folder: &Path,
 ) -> Result<(), failure::Error> {
     let mut avformat_context = AVFormatContext::new().map_err(|error| {
         format_err!("Could not allocate a context to process the video: {:?}", error)
     })?;
-    avformat_context.open_input(input_file.as_ref()).map_err(|error| {
+    avformat_context.open_input(input_file).map_err(|error| {
         format_err!("Could not open video input: {:?}", error)
     })?;
+    let duration = avformat_context.duration()?;
 
+    let spritesheet_path = output_folder.join("spritesheets");
+    std::fs::create_dir_all(&spritesheet_path)?;
     let mut spritesheet_manager = SpritesheetManager::new(
         max_size,
         num_horizontal, num_vertical,
         frame_interval,
-        &output_folder,
+        spritesheet_path,
         "preview"
     );
 
@@ -36,7 +41,6 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
 
     let index = stream.index();
     let time_base = stream.time_base();
-    let duration = stream.duration()?;
 
     let codec_parameters = stream.codec_parameters();
     let local_codec = codec_parameters.find_decoder();
@@ -46,6 +50,12 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
         index,
         codec_parameters.codec_type(),
         local_codec.name()
+    );
+
+    let mut metadata = StreamMetadata::new(
+        avformat_context.input_format().determine_mime(local_codec.name())?,
+        duration,
+        codec_parameters.bit_rate() / 1000
     );
 
     let mut output_frame = AVFrame::new().map_err(|error| {
@@ -91,6 +101,7 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
                     if spritesheet_manager.fulfils_frame_interval(timestamp) {
                         if !spritesheet_manager.initialized() {
                             spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32);
+                            metadata.set_frame_size(frame.width(), frame.height());
                             output_frame.init(
                                 spritesheet_manager.sprite_width() as i32,
                                 spritesheet_manager.sprite_height() as i32,
@@ -127,6 +138,12 @@ pub fn extract<T: AsRef<str>, U: AsRef<str>>(
         spritesheet_manager.end_frame(duration);
         spritesheet_manager.save()?;
     }
+
+    metadata.save(
+        output_folder.join("metadata.json")
+    ).map_err(|error| {
+        format_err!("Could not write stream metadata: {}", error)
+    })?;
 
     Ok(())
 }
