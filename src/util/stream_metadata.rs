@@ -1,6 +1,6 @@
 use std::fs::File;
-use std::path::Path;
 use std::io::BufWriter;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,11 @@ pub struct StreamMetadata {
 }
 
 impl StreamMetadata {
-    pub fn new<T: AsRef<str>>(content_type: T, duration: MediaTime, bitrate: i64) -> StreamMetadata {
+    pub fn new<T: AsRef<str>>(
+        content_type: T,
+        duration: MediaTime,
+        bitrate: i64,
+    ) -> StreamMetadata {
         StreamMetadata {
             content_type: String::from(content_type.as_ref()),
             duration: duration.seconds(),

@@ -11,7 +11,7 @@ use structopt::StructOpt;
 use crate::util::media_time::MediaTime;
 
 #[derive(StructOpt, Debug)]
-#[structopt(author,about)]
+#[structopt(author, about)]
 struct Options {
     input: String,
     output: String,
@@ -34,7 +34,7 @@ fn main() -> Result<(), failure::Error> {
         options.num_vertical,
         MediaTime::from_seconds(options.frame_interval),
         Path::new(&options.input),
-        Path::new(&options.output)
+        Path::new(&options.output),
     )?;
 
     Ok(())

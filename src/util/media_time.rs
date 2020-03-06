@@ -1,20 +1,20 @@
-use fraction::Fraction;
 use failure::format_err;
+use fraction::Fraction;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct MediaTime(time::Duration);
 
 impl MediaTime {
     pub fn from_rational(timestamp: i64, base: Fraction) -> Result<MediaTime, failure::Error> {
-        let num: u64 = *base.numer().ok_or_else(|| {
-            format_err!("time base of unusable format")
-        })?;
-        let den: u64 = *base.denom().ok_or_else(|| {
-            format_err!("time base of unusable format")
-        })?;
+        let num: u64 = *base
+            .numer()
+            .ok_or_else(|| format_err!("time base of unusable format"))?;
+        let den: u64 = *base
+            .denom()
+            .ok_or_else(|| format_err!("time base of unusable format"))?;
 
         Ok(MediaTime(time::Duration::milliseconds(
-            (1000 * timestamp as i128 * num as i128 / den as i128) as i64
+            (1000 * timestamp as i128 * num as i128 / den as i128) as i64,
         )))
     }
 

@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use image::{RgbImage, ImageBuffer};
 use failure::{bail, format_err};
+use image::{ImageBuffer, RgbImage};
 
 use crate::util::media_time::MediaTime;
-use crate::util::webvtt::{WebVTTFile, WebVTTCue};
+use crate::util::webvtt::{WebVTTCue, WebVTTFile};
 
 pub struct SpritesheetManager {
     num_horizontal: u32,
@@ -23,7 +23,14 @@ pub struct SpritesheetManager {
 }
 
 impl SpritesheetManager {
-    pub fn new<T: AsRef<str>, U: Into<PathBuf>>(max_side: u32, num_horizontal: u32, num_vertical: u32, frame_interval: MediaTime, output_path: U, name: T) -> SpritesheetManager {
+    pub fn new<T: AsRef<str>, U: Into<PathBuf>>(
+        max_side: u32,
+        num_horizontal: u32,
+        num_vertical: u32,
+        frame_interval: MediaTime,
+        output_path: U,
+        name: T,
+    ) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,
             num_vertical,
@@ -94,22 +101,24 @@ impl SpritesheetManager {
         self.current_image == 0 || timestamp - self.last_timestamp > self.frame_interval
     }
 
-    pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) -> Result<(), failure::Error> {
+    pub fn add_image(
+        &mut self,
+        timestamp: MediaTime,
+        image: RgbImage,
+    ) -> Result<(), failure::Error> {
         if image.width() != self.sprite_width || image.height() != self.sprite_height {
             bail!(
                 "Wrong image size: {}x{}, but expected {}x{}",
-                image.width(), image.height(),
-                self.sprite_width, self.sprite_height
+                image.width(),
+                image.height(),
+                self.sprite_width,
+                self.sprite_height
             )
         }
 
         let x = self.x(self.current_image);
         let y = self.y(self.current_image);
-        image::imageops::overlay(
-            &mut self.spritesheet,
-            &image,
-            x, y,
-        );
+        image::imageops::overlay(&mut self.spritesheet, &image, x, y);
 
         if self.current_image != 0 {
             self.end_frame(timestamp);
@@ -142,22 +151,22 @@ impl SpritesheetManager {
     }
 
     fn save_spritesheet(&mut self) -> Result<(), failure::Error> {
-        self.spritesheet.save(
-            self.output_path.join(format!("{}_{}.jpg", self.name, self.spritesheet_index(self.current_image)))
-        ).map_err(|error| {
-            format_err!("Could not write spritesheet: {}", error)
-        })?;
+        self.spritesheet
+            .save(self.output_path.join(format!(
+                "{}_{}.jpg",
+                self.name,
+                self.spritesheet_index(self.current_image)
+            )))
+            .map_err(|error| format_err!("Could not write spritesheet: {}", error))?;
         self.reinit_buffer();
         Ok(())
     }
 
     pub fn save(&mut self) -> Result<(), failure::Error> {
         self.save_spritesheet()?;
-        self.metadata.save(
-            self.output_path.join(format!("{}.vtt", self.name))
-        ).map_err(|error| {
-            format_err!("Could not write spritesheet metadata: {}", error)
-        })?;
+        self.metadata
+            .save(self.output_path.join(format!("{}.vtt", self.name)))
+            .map_err(|error| format_err!("Could not write spritesheet metadata: {}", error))?;
         Ok(())
     }
 }

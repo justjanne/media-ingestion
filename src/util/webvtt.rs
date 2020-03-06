@@ -7,7 +7,7 @@ use std::string::String;
 use crate::util::media_time::MediaTime;
 
 pub struct WebVTTFile {
-    cues: Vec<WebVTTCue>
+    cues: Vec<WebVTTCue>,
 }
 
 pub struct WebVTTCue {
@@ -18,9 +18,7 @@ pub struct WebVTTCue {
 
 impl WebVTTFile {
     pub fn new() -> WebVTTFile {
-        WebVTTFile {
-            cues: Vec::new()
-        }
+        WebVTTFile { cues: Vec::new() }
     }
 
     pub fn add(&mut self, cue: WebVTTCue) {
@@ -41,10 +39,14 @@ impl WebVTTFile {
 
 impl WebVTTCue {
     pub fn new(start: MediaTime, end: MediaTime, payload: String) -> WebVTTCue {
-        WebVTTCue { start, end, payload }
+        WebVTTCue {
+            start,
+            end,
+            payload,
+        }
     }
 
-    fn save(&self, writer: &mut LineWriter<File>) -> Result<(), std::io::Error>{
+    fn save(&self, writer: &mut LineWriter<File>) -> Result<(), std::io::Error> {
         writer.write_all(format!("{} --> {}\n", self.start, self.end).as_bytes())?;
         writer.write_all(self.payload.as_bytes())?;
         writer.write_all(b"\n\n")?;

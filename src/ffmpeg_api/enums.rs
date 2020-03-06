@@ -1,5 +1,5 @@
-use ffmpeg_dev::sys as ffi;
 use enum_primitive::*;
+use ffmpeg_dev::sys as ffi;
 
 enum_from_primitive! {
     #[doc = " Pixel format."]

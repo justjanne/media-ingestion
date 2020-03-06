@@ -23,7 +23,8 @@ impl<'a> AVFormatContext {
     }
 
     pub fn open_input(&mut self, path: &Path) -> Result<(), failure::Error> {
-        let path = path.to_str()
+        let path = path
+            .to_str()
             .ok_or_else(|| failure::format_err!("Could not convert path to c string"))?;
         let path = std::ffi::CString::new(path)
             .map_err(|_| failure::format_err!("Could not convert path to c string"))?;
@@ -37,7 +38,7 @@ impl<'a> AVFormatContext {
             )
         } {
             0 => Ok(()),
-            _ => bail!("Could not open input")
+            _ => bail!("Could not open input"),
         }
     }
 
@@ -46,45 +47,40 @@ impl<'a> AVFormatContext {
     }
 
     pub fn streams(&self) -> Vec<AVStream> {
-        Vec::from(
-            unsafe {
-                std::slice::from_raw_parts(
-                    (*self.base).streams,
-                    (*self.base).nb_streams as usize,
-                )
-            }
-        ).iter().map(|stream| {
-            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"))
-        }).collect()
+        Vec::from(unsafe {
+            std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
+        })
+        .iter()
+        .map(|stream| AVStream::new(unsafe { (*stream).as_mut() }.expect("not null")))
+        .collect()
     }
 
-    pub fn find_stream<P>(&self, predicate: P) -> Option<AVStream> where
-        P: FnMut(&AVStream) -> bool {
-        Vec::from(
-            unsafe {
-                std::slice::from_raw_parts(
-                    (*self.base).streams,
-                    (*self.base).nb_streams as usize,
-                )
-            }
-        ).iter().map(|stream| {
-            AVStream::new(unsafe { (*stream).as_mut() }.expect("not null"))
-        }).find(predicate)
+    pub fn find_stream<P>(&self, predicate: P) -> Option<AVStream>
+    where
+        P: FnMut(&AVStream) -> bool,
+    {
+        Vec::from(unsafe {
+            std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
+        })
+        .iter()
+        .map(|stream| AVStream::new(unsafe { (*stream).as_mut() }.expect("not null")))
+        .find(predicate)
     }
 
     pub fn read_frame(&mut self, packet: &mut AVPacket) -> Result<(), failure::Error> {
         match unsafe { ffi::av_read_frame(self.base, packet.base) } {
             0 => Ok(()),
-            errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
+            errno => Err(failure::format_err!(
+                "Error while decoding frame: {}",
+                errno
+            )),
         }
     }
 
     pub fn duration(&self) -> Result<media_time::MediaTime, failure::Error> {
         media_time::MediaTime::from_rational(
-            unsafe { (*self.base).duration }, Fraction::new(
-                1 as u64,
-                ffi::AV_TIME_BASE as u64,
-            ),
+            unsafe { (*self.base).duration },
+            Fraction::new(1 as u64, ffi::AV_TIME_BASE as u64),
         )
     }
 }
@@ -96,7 +92,7 @@ impl Drop for AVFormatContext {
 }
 
 pub struct AVInputFormat<'a> {
-    base: &'a mut ffi::AVInputFormat
+    base: &'a mut ffi::AVInputFormat,
 }
 
 impl<'a> AVInputFormat<'a> {
@@ -110,11 +106,13 @@ impl<'a> AVInputFormat<'a> {
         if raw.is_null() {
             Err(failure::format_err!("No mime type found"))
         } else {
-            Ok(String::from(unsafe {
-                std::ffi::CStr::from_ptr(raw)
-            }.to_str().map_err(|err| {
-                failure::format_err!("Could not convert mime type to string: {}", err)
-            })?))
+            Ok(String::from(
+                unsafe { std::ffi::CStr::from_ptr(raw) }
+                    .to_str()
+                    .map_err(|err| {
+                        failure::format_err!("Could not convert mime type to string: {}", err)
+                    })?,
+            ))
         }
     }
 
@@ -124,11 +122,13 @@ impl<'a> AVInputFormat<'a> {
         if raw.is_null() {
             Err(failure::format_err!("No mime type found"))
         } else {
-            Ok(String::from(unsafe {
-                std::ffi::CStr::from_ptr(raw)
-            }.to_str().map_err(|err| {
-                failure::format_err!("Could not convert mime type to string: {}", err)
-            })?))
+            Ok(String::from(
+                unsafe { std::ffi::CStr::from_ptr(raw) }
+                    .to_str()
+                    .map_err(|err| {
+                        failure::format_err!("Could not convert mime type to string: {}", err)
+                    })?,
+            ))
         }
     }
 
@@ -138,11 +138,13 @@ impl<'a> AVInputFormat<'a> {
         if raw.is_null() {
             Err(failure::format_err!("No mime type found"))
         } else {
-            Ok(String::from(unsafe {
-                std::ffi::CStr::from_ptr(raw)
-            }.to_str().map_err(|err| {
-                failure::format_err!("Could not convert mime type to string: {}", err)
-            })?))
+            Ok(String::from(
+                unsafe { std::ffi::CStr::from_ptr(raw) }
+                    .to_str()
+                    .map_err(|err| {
+                        failure::format_err!("Could not convert mime type to string: {}", err)
+                    })?,
+            ))
         }
     }
 
@@ -159,7 +161,7 @@ impl<'a> AVInputFormat<'a> {
                     _ => {
                         // Do nothing
                     }
-                }
+                },
                 "webm" => match stream_codec {
                     "vp8" | "vp9" | "av1" => {
                         return Ok(String::from("video/webm"));
@@ -167,14 +169,18 @@ impl<'a> AVInputFormat<'a> {
                     _ => {
                         // Do nothing
                     }
-                }
+                },
                 _ => {
                     // Do nothing
                 }
             }
         }
 
-        return Err(failure::format_err!("Could not determine mime type: {} video in {} container", stream_codec, containers));
+        return Err(failure::format_err!(
+            "Could not determine mime type: {} video in {} container",
+            stream_codec,
+            containers
+        ));
     }
 }
 
@@ -193,19 +199,18 @@ impl AVBuffer {
     }
 
     pub fn empty() -> Self {
-        AVBuffer { base: std::ptr::null_mut(), size: 0 }
+        AVBuffer {
+            base: std::ptr::null_mut(),
+            size: 0,
+        }
     }
 
     pub fn data(&self) -> &[u8] {
-        unsafe {
-            std::slice::from_raw_parts(self.base, self.size)
-        }
+        unsafe { std::slice::from_raw_parts(self.base, self.size) }
     }
 
     pub fn data_mut(&mut self) -> &[u8] {
-        unsafe {
-            std::slice::from_raw_parts_mut(self.base, self.size)
-        }
+        unsafe { std::slice::from_raw_parts_mut(self.base, self.size) }
     }
 }
 
@@ -258,10 +263,18 @@ impl AVFrame {
         if base.is_null() {
             bail!("avformat_alloc_frame() failed");
         }
-        Ok(AVFrame { base, buffer: AVBuffer::empty() })
+        Ok(AVFrame {
+            base,
+            buffer: AVBuffer::empty(),
+        })
     }
 
-    pub fn init(&mut self, width: i32, height: i32, format: AVPixelFormat) -> Result<(), failure::Error> {
+    pub fn init(
+        &mut self,
+        width: i32,
+        height: i32,
+        format: AVPixelFormat,
+    ) -> Result<(), failure::Error> {
         let mut base = unsafe { self.base.as_mut() }.expect("not null");
 
         base.width = width;
@@ -298,13 +311,16 @@ impl AVFrame {
     pub fn format(&self) -> AVPixelFormat {
         let base = unsafe { self.base.as_ref() }.expect("not null");
 
-        AVPixelFormat::from_i32(base.format)
-            .unwrap_or(AVPixelFormat::NONE)
+        AVPixelFormat::from_i32(base.format).unwrap_or(AVPixelFormat::NONE)
     }
 
     pub fn size(&self) -> usize {
         unsafe {
-            ffi::avpicture_get_size(self.format() as ffi::AVPixelFormat, self.width(), self.height()) as usize
+            ffi::avpicture_get_size(
+                self.format() as ffi::AVPixelFormat,
+                self.width(),
+                self.height(),
+            ) as usize
         }
     }
 
@@ -353,17 +369,13 @@ impl AVFrame {
     pub fn data(&self, index: usize) -> &[u8] {
         let base = unsafe { self.base.as_ref() }.expect("not null");
 
-        unsafe {
-            std::slice::from_raw_parts(base.data[index], self.size())
-        }
+        unsafe { std::slice::from_raw_parts(base.data[index], self.size()) }
     }
 
     pub fn data_mut(&mut self, index: usize) -> &mut [u8] {
         let base = unsafe { self.base.as_mut() }.expect("not null");
 
-        unsafe {
-            std::slice::from_raw_parts_mut(base.data[index], self.size())
-        }
+        unsafe { std::slice::from_raw_parts_mut(base.data[index], self.size()) }
     }
 }
 
@@ -374,7 +386,7 @@ impl Drop for AVFrame {
 }
 
 pub struct AVStream<'a> {
-    base: &'a mut ffi::AVStream
+    base: &'a mut ffi::AVStream,
 }
 
 impl<'a> AVStream<'a> {
@@ -393,7 +405,10 @@ impl<'a> AVStream<'a> {
         )
     }
 
-    pub fn timestamp(self: &AVStream<'a>, timestamp: i64) -> Result<media_time::MediaTime, failure::Error> {
+    pub fn timestamp(
+        self: &AVStream<'a>,
+        timestamp: i64,
+    ) -> Result<media_time::MediaTime, failure::Error> {
         media_time::MediaTime::from_rational(timestamp, self.time_base())
     }
 
@@ -428,7 +443,10 @@ impl<'a> AVStream<'a> {
     }
 
     pub fn codec_parameters(&self) -> AVCodecParameters {
-        AVCodecParameters::new(unsafe { self.base.codecpar.as_mut() }.expect("not null"), self)
+        AVCodecParameters::new(
+            unsafe { self.base.codecpar.as_mut() }.expect("not null"),
+            self,
+        )
     }
 }
 
@@ -439,7 +457,10 @@ pub struct AVCodecParameters<'a> {
 
 impl<'a> AVCodecParameters<'a> {
     fn new(base: &'a mut ffi::AVCodecParameters, _: &'a AVStream) -> Self {
-        return AVCodecParameters { base, phantom: PhantomData };
+        return AVCodecParameters {
+            base,
+            phantom: PhantomData,
+        };
     }
 
     pub fn codec_type(&self) -> AVMediaType {
@@ -456,7 +477,8 @@ impl<'a> AVCodecParameters<'a> {
 
     pub fn find_decoder(&self) -> AVCodec {
         AVCodec::new(
-            unsafe { ffi::avcodec_find_decoder(self.base.codec_id).as_mut() }.expect("Decoder not found"),
+            unsafe { ffi::avcodec_find_decoder(self.base.codec_id).as_mut() }
+                .expect("Decoder not found"),
             self,
         )
     }
@@ -469,11 +491,18 @@ pub struct AVCodec<'a> {
 
 impl<'a> AVCodec<'a> {
     fn new(base: &'a mut ffi::AVCodec, _: &'a AVCodecParameters) -> Self {
-        return AVCodec { base, phantom: PhantomData };
+        return AVCodec {
+            base,
+            phantom: PhantomData,
+        };
     }
 
     pub fn name(self: &AVCodec<'a>) -> std::string::String {
-        String::from(unsafe { std::ffi::CStr::from_ptr(self.base.name) }.to_str().unwrap())
+        String::from(
+            unsafe { std::ffi::CStr::from_ptr(self.base.name) }
+                .to_str()
+                .unwrap(),
+        )
     }
 }
 
@@ -493,14 +522,20 @@ impl AVCodecContext {
     pub fn in_packet(&mut self, packet: &mut AVPacket) -> Result<(), failure::Error> {
         match unsafe { ffi::avcodec_send_packet(self.base, packet.base) } {
             0 => Ok(()),
-            errno => Err(failure::format_err!("Error while loading paclet: {}", errno))
+            errno => Err(failure::format_err!(
+                "Error while loading paclet: {}",
+                errno
+            )),
         }
     }
 
     pub fn out_frame(&mut self, frame: &mut AVFrame) -> Result<(), failure::Error> {
         match unsafe { ffi::avcodec_receive_frame(self.base, frame.base) } {
             0 => Ok(()),
-            errno => Err(failure::format_err!("Error while decoding frame: {}", errno))
+            errno => Err(failure::format_err!(
+                "Error while decoding frame: {}",
+                errno
+            )),
         }
     }
 
@@ -565,10 +600,17 @@ pub struct SwsContext {
 
 impl SwsContext {
     pub fn new() -> Self {
-        SwsContext { base: std::ptr::null_mut() }
+        SwsContext {
+            base: std::ptr::null_mut(),
+        }
     }
 
-    pub fn reinit(&mut self, source: &AVFrame, target: &AVFrame, scaler: SwsScaler) -> Result<(), failure::Error> {
+    pub fn reinit(
+        &mut self,
+        source: &AVFrame,
+        target: &AVFrame,
+        scaler: SwsScaler,
+    ) -> Result<(), failure::Error> {
         let base = unsafe {
             ffi::sws_getCachedContext(
                 self.base,
@@ -596,7 +638,13 @@ impl SwsContext {
         self.scale_slice(source, target, 0, source.height())
     }
 
-    pub fn scale_slice(&self, source: &AVFrame, target: &mut AVFrame, slice_from: i32, slice_to: i32) -> i32 {
+    pub fn scale_slice(
+        &self,
+        source: &AVFrame,
+        target: &mut AVFrame,
+        slice_from: i32,
+        slice_to: i32,
+    ) -> i32 {
         unsafe {
             ffi::sws_scale(
                 self.base,
