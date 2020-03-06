@@ -1,7 +1,17 @@
 [package]
-name = "thumbnailgen"
+name = "media-ingestion"
 version = "0.1.0"
 authors = ["Janne Mareike Koschinski <janne@kuschku.de>"]
+
+description = """
+Tool to automatically extract preview spritesheets, metadata information and thumbnails from video files.
+Designed for use in media library management software.
+"""
+
+repository = "https://github.com/justjanne/media-ingestion"
+readme = "README.md"
+license = "MPL-2.0"
+
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,3 +27,4 @@ mime = "0.3.16"
 time = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+structopt = "0.3"
