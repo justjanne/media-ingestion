@@ -104,13 +104,16 @@ impl<'a> AVInputFormat<'a> {
         let raw: *const ::std::os::raw::c_char = self.base.long_name;
 
         if raw.is_null() {
-            Err(failure::format_err!("No mime type found"))
+            Err(failure::format_err!("No long name found for input format"))
         } else {
             Ok(String::from(
                 unsafe { std::ffi::CStr::from_ptr(raw) }
                     .to_str()
                     .map_err(|err| {
-                        failure::format_err!("Could not convert mime type to string: {}", err)
+                        failure::format_err!(
+                            "Could not convert long name for input format to string: {}",
+                            err
+                        )
                     })?,
             ))
         }
@@ -120,67 +123,38 @@ impl<'a> AVInputFormat<'a> {
         let raw: *const ::std::os::raw::c_char = self.base.name;
 
         if raw.is_null() {
-            Err(failure::format_err!("No mime type found"))
+            Err(failure::format_err!("No name found for input format"))
         } else {
             Ok(String::from(
                 unsafe { std::ffi::CStr::from_ptr(raw) }
                     .to_str()
                     .map_err(|err| {
-                        failure::format_err!("Could not convert mime type to string: {}", err)
+                        failure::format_err!(
+                            "Could not convert name for input format to string: {}",
+                            err
+                        )
                     })?,
             ))
         }
     }
 
-    pub fn mime(&self) -> Result<String, failure::Error> {
-        let raw: *const ::std::os::raw::c_char = self.base.mime_type;
-
-        if raw.is_null() {
-            Err(failure::format_err!("No mime type found"))
-        } else {
-            Ok(String::from(
-                unsafe { std::ffi::CStr::from_ptr(raw) }
-                    .to_str()
-                    .map_err(|err| {
-                        failure::format_err!("Could not convert mime type to string: {}", err)
-                    })?,
-            ))
-        }
-    }
-
-    pub fn determine_mime<T: AsRef<str>>(&self, stream_codec: T) -> Result<String, failure::Error> {
+    pub fn determine_mime<T: AsRef<str>>(&self, stream_codec: T) -> Result<&str, failure::Error> {
         let containers = self.name()?;
         let stream_codec = stream_codec.as_ref();
 
         for container in containers.split(",") {
-            match container {
-                "mp4" => match stream_codec {
-                    "h264" => {
-                        return Ok(String::from("video/mp4"));
-                    }
-                    _ => {
-                        // Do nothing
-                    }
-                },
-                "webm" => match stream_codec {
-                    "vp8" | "vp9" | "av1" => {
-                        return Ok(String::from("video/webm"));
-                    }
-                    _ => {
-                        // Do nothing
-                    }
-                },
-                _ => {
-                    // Do nothing
-                }
+            match (container, stream_codec) {
+                ("mp4", "h264") => return Ok("video/mp4"),
+                ("webm", "vp8") | ("webm", "vp9") | ("webm", "av1") => return Ok("video/webm"),
+                _ => {}
             }
         }
 
-        return Err(failure::format_err!(
+        bail!(
             "Could not determine mime type: {} video in {} container",
             stream_codec,
             containers
-        ));
+        )
     }
 }
 
