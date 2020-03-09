@@ -31,7 +31,7 @@ impl SpritesheetManager {
         frame_interval: MediaTime,
         output_path: impl Into<PathBuf>,
         name: impl AsRef<str>,
-        format: impl AsRef<str>
+        format: impl AsRef<str>,
     ) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,

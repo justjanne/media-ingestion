@@ -533,6 +533,7 @@ impl SwsContext {
         source: &AVFrame,
         target: &AVFrame,
         scaler: SwsScaler,
+        flags: SwsFlags,
     ) -> Result<(), Error> {
         let base = unsafe {
             ffi::sws_getCachedContext(
@@ -543,7 +544,7 @@ impl SwsContext {
                 target.width(),
                 target.height(),
                 target.format() as ffi::AVPixelFormat,
-                scaler as i32,
+                scaler as std::os::raw::c_int | flags.bits() as std::os::raw::c_int,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 std::ptr::null(),

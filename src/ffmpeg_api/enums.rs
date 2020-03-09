@@ -1,5 +1,17 @@
+use bitflags::*;
 use enum_primitive::*;
 use ffmpeg_dev::sys as ffi;
+
+bitflags! {
+    #[derive(Default)]
+    pub struct SwsFlags: u32 {
+        const PRINT_INFO = ffi::SWS_PRINT_INFO;
+        const FULL_CHROMA_INTERPOLATION = ffi::SWS_FULL_CHR_H_INT;
+        const FULL_CHROMA_INPUT = ffi::SWS_FULL_CHR_H_INP;
+        const ACCURATE_ROUNDING = ffi::SWS_ACCURATE_RND;
+        const BIT_EXACT_SCALING = ffi::SWS_BITEXACT;
+    }
+}
 
 enum_from_primitive! {
     #[doc = " Pixel format."]

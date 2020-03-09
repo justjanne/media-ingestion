@@ -17,6 +17,7 @@ pub fn extract(
     output_folder: &Path,
     format: impl AsRef<str>,
     scaler: SwsScaler,
+    flags: SwsFlags,
 ) -> Result<(), Error> {
     let mut avformat_context = AVFormatContext::new()
         .map_err(|error| format_err!("Could not open video input: {}", error))?;
@@ -34,7 +35,7 @@ pub fn extract(
         frame_interval,
         spritesheet_path,
         "preview",
-        format
+        format,
     );
 
     let mut stream: AVStream = avformat_context
@@ -120,7 +121,7 @@ pub fn extract(
                                     format_err!("Could not init output frame: {}", error)
                                 })?;
                             scale_context
-                                .reinit(&frame, &output_frame, scaler)
+                                .reinit(&frame, &output_frame, scaler, flags)
                                 .map_err(|error| {
                                     format_err!("Could not reinit scale context: {}", error)
                                 })?;

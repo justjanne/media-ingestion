@@ -9,8 +9,8 @@ use std::path::Path;
 use failure::Error;
 use structopt::StructOpt;
 
+use crate::ffmpeg_api::enums::{SwsFlags, SwsScaler};
 use crate::util::media_time::MediaTime;
-use crate::ffmpeg_api::enums::SwsScaler;
 
 fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
     match src {
@@ -25,7 +25,7 @@ fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
         "sinc" => Ok(SwsScaler::Sinc),
         "lanczos" => Ok(SwsScaler::Lanczos),
         "spline" => Ok(SwsScaler::Spline),
-        _ => Err(format!("Invalid scaler: {}", src))
+        _ => Err(format!("Invalid scaler: {}", src)),
     }
 }
 
@@ -46,10 +46,27 @@ struct Options {
     format: String,
     #[structopt(long = "scaler", default_value = "bilinear", parse(try_from_str = parse_scaler))]
     scaler: SwsScaler,
+    #[structopt(long = "accurate-chroma")]
+    accurate_chroma: bool,
+    #[structopt(long = "accurate-rounding")]
+    accurate_rounding: bool,
+    #[structopt(long = "accurate-scaling")]
+    accurate_scaling: bool,
 }
 
 fn main() -> Result<(), Error> {
     let options = Options::from_args();
+
+    let mut flags = SwsFlags::empty();
+    if options.accurate_chroma {
+        flags |= SwsFlags::FULL_CHROMA_INTERPOLATION | SwsFlags::FULL_CHROMA_INPUT;
+    }
+    if options.accurate_rounding {
+        flags |= SwsFlags::ACCURATE_ROUNDING;
+    }
+    if options.accurate_scaling {
+        flags |= SwsFlags::BIT_EXACT_SCALING;
+    }
 
     ingest::extract::extract(
         options.max_size,
@@ -60,6 +77,7 @@ fn main() -> Result<(), Error> {
         Path::new(&options.output),
         options.format,
         options.scaler,
+        flags,
     )?;
 
     Ok(())
