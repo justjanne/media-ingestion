@@ -25,9 +25,9 @@ impl<'a> AVFormatContext {
     pub fn open_input(&mut self, path: &Path) -> Result<(), failure::Error> {
         let path = path
             .to_str()
-            .ok_or_else(|| failure::format_err!("Could not convert path to c string"))?;
+            .ok_or(failure::format_err!("Could not convert path to c string"))?;
         let path = std::ffi::CString::new(path)
-            .map_err(|_| failure::format_err!("Could not convert path to c string"))?;
+            .map_err(|err| failure::format_err!("Could not convert path to c string: {}", err))?;
 
         match unsafe {
             ffi::avformat_open_input(
@@ -42,8 +42,11 @@ impl<'a> AVFormatContext {
         }
     }
 
-    pub fn input_format(&self) -> AVInputFormat {
-        AVInputFormat::new(unsafe { (*self.base).iformat.as_mut() }.expect("not null"))
+    pub fn input_format(&self) -> Result<AVInputFormat, failure::Error> {
+        let base: &mut ffi::AVInputFormat = unsafe { (*self.base).iformat.as_mut() }
+            .ok_or(failure::format_err!("No AVInputFormat found"))?;
+
+        Ok(AVInputFormat::new(base))
     }
 
     pub fn streams(&self) -> Vec<AVStream> {
@@ -51,7 +54,8 @@ impl<'a> AVFormatContext {
             std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
         })
         .iter()
-        .map(|stream| AVStream::new(unsafe { (*stream).as_mut() }.expect("not null")))
+        .filter_map(|stream: &*mut ffi::AVStream| unsafe { (*stream).as_mut() })
+        .map(|stream| AVStream::new(stream))
         .collect()
     }
 
@@ -63,17 +67,15 @@ impl<'a> AVFormatContext {
             std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
         })
         .iter()
-        .map(|stream| AVStream::new(unsafe { (*stream).as_mut() }.expect("not null")))
+        .filter_map(|stream: &*mut ffi::AVStream| unsafe { (*stream).as_mut() })
+        .map(|stream| AVStream::new(stream))
         .find(predicate)
     }
 
     pub fn read_frame(&mut self, packet: &mut AVPacket) -> Result<(), failure::Error> {
         match unsafe { ffi::av_read_frame(self.base, packet.base) } {
             0 => Ok(()),
-            errno => Err(failure::format_err!(
-                "Error while decoding frame: {}",
-                errno
-            )),
+            errno => bail!("Error while decoding frame: {}", errno),
         }
     }
 
@@ -104,7 +106,7 @@ impl<'a> AVInputFormat<'a> {
         let raw: *const ::std::os::raw::c_char = self.base.long_name;
 
         if raw.is_null() {
-            Err(failure::format_err!("No long name found for input format"))
+            bail!("No long name found for input format")
         } else {
             Ok(String::from(
                 unsafe { std::ffi::CStr::from_ptr(raw) }
@@ -123,7 +125,7 @@ impl<'a> AVInputFormat<'a> {
         let raw: *const ::std::os::raw::c_char = self.base.name;
 
         if raw.is_null() {
-            Err(failure::format_err!("No name found for input format"))
+            bail!("No name found for input format")
         } else {
             Ok(String::from(
                 unsafe { std::ffi::CStr::from_ptr(raw) }
@@ -201,22 +203,20 @@ impl AVPacket {
         Ok(AVPacket { base })
     }
 
-    pub fn pts(&self) -> i64 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
+    fn as_ref(&self) -> &ffi::AVPacket {
+        unsafe { self.base.as_ref() }.unwrap_or_else(|| panic!("AVPacket base unexpectedly null"))
+    }
 
-        base.pts
+    pub fn pts(&self) -> i64 {
+        self.as_ref().pts
     }
 
     pub fn dts(&self) -> i64 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.dts
+        self.as_ref().dts
     }
 
     pub fn stream_index(&self) -> i32 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.stream_index
+        self.as_ref().stream_index
     }
 }
 
@@ -249,11 +249,9 @@ impl AVFrame {
         height: i32,
         format: AVPixelFormat,
     ) -> Result<(), failure::Error> {
-        let mut base = unsafe { self.base.as_mut() }.expect("not null");
-
-        base.width = width;
-        base.height = height;
-        base.format = format as ffi::AVPixelFormat;
+        self.as_mut().width = width;
+        self.as_mut().height = height;
+        self.as_mut().format = format as ffi::AVPixelFormat;
 
         self.buffer = AVBuffer::new(self.size())?;
 
@@ -270,22 +268,24 @@ impl AVFrame {
         Ok(())
     }
 
-    pub fn width(&self) -> i32 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
+    fn as_ref(&self) -> &ffi::AVFrame {
+        unsafe { self.base.as_ref() }.unwrap_or_else(|| panic!("AVFrame base unexpectedly null"))
+    }
 
-        base.width
+    fn as_mut(&mut self) -> &mut ffi::AVFrame {
+        unsafe { self.base.as_mut() }.unwrap_or_else(|| panic!("AVFrame base unexpectedly null"))
+    }
+
+    pub fn width(&self) -> i32 {
+        self.as_ref().width
     }
 
     pub fn height(&self) -> i32 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.height
+        self.as_ref().height
     }
 
     pub fn format(&self) -> AVPixelFormat {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        AVPixelFormat::from_i32(base.format).unwrap_or(AVPixelFormat::NONE)
+        AVPixelFormat::from_i32(self.as_ref().format).unwrap_or(AVPixelFormat::NONE)
     }
 
     pub fn size(&self) -> usize {
@@ -299,57 +299,39 @@ impl AVFrame {
     }
 
     pub fn key_frame(&self) -> bool {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.key_frame != 0
+        self.as_ref().key_frame != 0
     }
 
     pub fn pts(&self) -> i64 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.pts
+        self.as_ref().pts
     }
 
     pub fn coded_picture_number(&self) -> i32 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.coded_picture_number
+        self.as_ref().coded_picture_number
     }
 
     pub fn display_picture_number(&self) -> i32 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.display_picture_number
+        self.as_ref().display_picture_number
     }
 
     pub fn linesize(&self) -> &[i32] {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        &base.linesize
+        &self.as_ref().linesize
     }
 
     pub fn data_ptr(&self) -> *const *const u8 {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        base.data.as_ptr() as *const *const u8
+        self.as_ref().data.as_ptr() as *const *const u8
     }
 
     pub fn data_mut_ptr(&mut self) -> *mut *mut u8 {
-        let base = unsafe { self.base.as_mut() }.expect("not null");
-
-        base.data.as_mut_ptr() as *mut *mut u8
+        self.as_mut().data.as_mut_ptr() as *mut *mut u8
     }
 
     pub fn data(&self, index: usize) -> &[u8] {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        unsafe { std::slice::from_raw_parts(base.data[index], self.size()) }
+        unsafe { std::slice::from_raw_parts(self.as_ref().data[index], self.size()) }
     }
 
     pub fn data_mut(&mut self, index: usize) -> &mut [u8] {
-        let base = unsafe { self.base.as_mut() }.expect("not null");
-
-        unsafe { std::slice::from_raw_parts_mut(base.data[index], self.size()) }
+        unsafe { std::slice::from_raw_parts_mut(self.as_mut().data[index], self.size()) }
     }
 }
 
@@ -416,11 +398,12 @@ impl<'a> AVStream<'a> {
         )
     }
 
-    pub fn codec_parameters(&self) -> AVCodecParameters {
-        AVCodecParameters::new(
-            unsafe { self.base.codecpar.as_mut() }.expect("not null"),
+    pub fn codec_parameters(&self) -> Result<AVCodecParameters, failure::Error> {
+        Ok(AVCodecParameters::new(
+            unsafe { self.base.codecpar.as_mut() }
+                .ok_or(failure::format_err!("No AVCodecParameters found"))?,
             self,
-        )
+        ))
     }
 }
 
@@ -452,7 +435,7 @@ impl<'a> AVCodecParameters<'a> {
     pub fn find_decoder(&self) -> AVCodec {
         AVCodec::new(
             unsafe { ffi::avcodec_find_decoder(self.base.codec_id).as_mut() }
-                .expect("Decoder not found"),
+                .expect("AVCodec was unexpectedly null"),
             self,
         )
     }
@@ -513,40 +496,38 @@ impl AVCodecContext {
         }
     }
 
-    pub fn skip_loop_filter(&self) -> Option<AVDiscard> {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
+    fn as_ref(&self) -> &ffi::AVCodecContext {
+        unsafe { self.base.as_ref() }
+            .unwrap_or_else(|| panic!("AVCodecContext base unexpectedly null"))
+    }
 
-        AVDiscard::from_i32(base.skip_loop_filter)
+    fn as_mut(&mut self) -> &mut ffi::AVCodecContext {
+        unsafe { self.base.as_mut() }
+            .unwrap_or_else(|| panic!("AVCodecContext base unexpectedly null"))
+    }
+
+    pub fn skip_loop_filter(&self) -> Option<AVDiscard> {
+        AVDiscard::from_i32(self.as_ref().skip_loop_filter)
     }
 
     pub fn set_skip_loop_filter(&mut self, value: AVDiscard) {
-        let base = unsafe { self.base.as_mut() }.expect("not null");
-
-        base.skip_loop_filter = value as ffi::AVDiscard
+        self.as_mut().skip_loop_filter = value as ffi::AVDiscard
     }
 
     pub fn skip_idct(&self) -> Option<AVDiscard> {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        AVDiscard::from_i32(base.skip_idct)
+        AVDiscard::from_i32(self.as_ref().skip_idct)
     }
 
     pub fn set_skip_idct(&mut self, value: AVDiscard) {
-        let base = unsafe { self.base.as_mut() }.expect("not null");
-
-        base.skip_idct = value as ffi::AVDiscard
+        self.as_mut().skip_idct = value as ffi::AVDiscard
     }
 
     pub fn skip_frame(&self) -> Option<AVDiscard> {
-        let base = unsafe { self.base.as_ref() }.expect("not null");
-
-        AVDiscard::from_i32(base.skip_frame)
+        AVDiscard::from_i32(self.as_ref().skip_frame)
     }
 
     pub fn set_skip_frame(&mut self, value: AVDiscard) {
-        let base = unsafe { self.base.as_mut() }.expect("not null");
-
-        base.skip_frame = value as ffi::AVDiscard
+        self.as_mut().skip_frame = value as ffi::AVDiscard
     }
 
     pub fn set_parameters(&mut self, params: &AVCodecParameters) {

@@ -34,14 +34,20 @@ pub fn extract(
     );
 
     let mut stream: AVStream = avformat_context
-        .find_stream(|stream| stream.codec_parameters().codec_type() == AVMediaType::Video)
+        .find_stream(|stream| {
+            if let Ok(codec_parameters) = stream.codec_parameters() {
+                return codec_parameters.codec_type() == AVMediaType::Video;
+            }
+
+            false
+        })
         .ok_or_else(|| format_err!("Could not find video stream"))?;
     stream.set_discard(AVDiscard::NonKey);
 
     let index = stream.index();
     let time_base = stream.time_base();
 
-    let codec_parameters = stream.codec_parameters();
+    let codec_parameters = stream.codec_parameters()?;
     let local_codec = codec_parameters.find_decoder();
 
     println!(
@@ -53,7 +59,7 @@ pub fn extract(
 
     let mut metadata = StreamMetadata::new(
         avformat_context
-            .input_format()
+            .input_format()?
             .determine_mime(local_codec.name())?,
         duration,
         codec_parameters.bit_rate() / 1000,
