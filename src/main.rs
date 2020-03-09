@@ -42,29 +42,29 @@ struct Options {
     num_vertical: u32,
     #[structopt(long = "max-size", default_value = "160")]
     max_size: u32,
-    #[structopt(long = "format", default_value = "jpg")]
+    #[structopt(long = "format", default_value = "png")]
     format: String,
-    #[structopt(long = "scaler", default_value = "bilinear", parse(try_from_str = parse_scaler))]
+    #[structopt(long = "scaler", default_value = "area", parse(try_from_str = parse_scaler))]
     scaler: SwsScaler,
-    #[structopt(long = "accurate-chroma")]
-    accurate_chroma: bool,
-    #[structopt(long = "accurate-rounding")]
-    accurate_rounding: bool,
-    #[structopt(long = "accurate-scaling")]
-    accurate_scaling: bool,
+    #[structopt(long = "fast-chroma")]
+    fast_chroma: bool,
+    #[structopt(long = "fast-rounding")]
+    fast_rounding: bool,
+    #[structopt(long = "fast-scaling")]
+    fast_scaling: bool,
 }
 
 fn main() -> Result<(), Error> {
     let options = Options::from_args();
 
     let mut flags = SwsFlags::empty();
-    if options.accurate_chroma {
+    if !options.fast_chroma {
         flags |= SwsFlags::FULL_CHROMA_INTERPOLATION | SwsFlags::FULL_CHROMA_INPUT;
     }
-    if options.accurate_rounding {
+    if !options.fast_rounding {
         flags |= SwsFlags::ACCURATE_ROUNDING;
     }
-    if options.accurate_scaling {
+    if !options.fast_scaling {
         flags |= SwsFlags::BIT_EXACT_SCALING;
     }
 
