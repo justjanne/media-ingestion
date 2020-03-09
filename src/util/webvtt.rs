@@ -25,7 +25,7 @@ impl WebVTTFile {
         self.cues.push(cue);
     }
 
-    pub fn save<T: AsRef<Path>>(&self, path: T) -> Result<(), std::io::Error> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let file = File::create(path)?;
         let mut file = LineWriter::new(file);
         file.write_all(b"WEBVTT\n\n")?;

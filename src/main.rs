@@ -6,6 +6,7 @@ pub(crate) mod util;
 
 use std::path::Path;
 
+use failure::Error;
 use structopt::StructOpt;
 
 use crate::util::media_time::MediaTime;
@@ -25,7 +26,7 @@ struct Options {
     max_size: u32,
 }
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> Result<(), Error> {
     let options = Options::from_args();
 
     ingest::extract::extract(

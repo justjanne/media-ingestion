@@ -17,11 +17,7 @@ pub struct StreamMetadata {
 }
 
 impl StreamMetadata {
-    pub fn new<T: AsRef<str>>(
-        content_type: T,
-        duration: MediaTime,
-        bitrate: i64,
-    ) -> StreamMetadata {
+    pub fn new(content_type: impl AsRef<str>, duration: MediaTime, bitrate: i64) -> StreamMetadata {
         StreamMetadata {
             content_type: String::from(content_type.as_ref()),
             duration: duration.seconds(),
@@ -38,7 +34,7 @@ impl StreamMetadata {
         self.aspect_ratio = (width as f64 / height as f64) as f32;
     }
 
-    pub fn save<T: AsRef<Path>>(&self, path: T) -> Result<(), std::io::Error> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         serde_json::to_writer(BufWriter::new(File::create(path)?), self)?;
         Ok(())
     }

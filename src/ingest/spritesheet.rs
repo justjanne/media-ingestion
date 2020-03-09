@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use failure::{bail, format_err};
+use failure::{bail, format_err, Error};
 use image::{ImageBuffer, RgbImage};
 
 use crate::util::media_time::MediaTime;
@@ -23,13 +23,13 @@ pub struct SpritesheetManager {
 }
 
 impl SpritesheetManager {
-    pub fn new<T: AsRef<str>, U: Into<PathBuf>>(
+    pub fn new(
         max_side: u32,
         num_horizontal: u32,
         num_vertical: u32,
         frame_interval: MediaTime,
-        output_path: U,
-        name: T,
+        output_path: impl Into<PathBuf>,
+        name: impl AsRef<str>,
     ) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,
@@ -101,11 +101,7 @@ impl SpritesheetManager {
         self.current_image == 0 || timestamp - self.last_timestamp > self.frame_interval
     }
 
-    pub fn add_image(
-        &mut self,
-        timestamp: MediaTime,
-        image: RgbImage,
-    ) -> Result<(), failure::Error> {
+    pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) -> Result<(), Error> {
         if image.width() != self.sprite_width || image.height() != self.sprite_height {
             bail!(
                 "Wrong image size: {}x{}, but expected {}x{}",
@@ -150,7 +146,7 @@ impl SpritesheetManager {
         ));
     }
 
-    fn save_spritesheet(&mut self) -> Result<(), failure::Error> {
+    fn save_spritesheet(&mut self) -> Result<(), Error> {
         self.spritesheet
             .save(self.output_path.join(format!(
                 "{}_{}.jpg",
@@ -162,7 +158,7 @@ impl SpritesheetManager {
         Ok(())
     }
 
-    pub fn save(&mut self) -> Result<(), failure::Error> {
+    pub fn save(&mut self) -> Result<(), Error> {
         self.save_spritesheet()?;
         self.metadata
             .save(self.output_path.join(format!("{}.vtt", self.name)))

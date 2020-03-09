@@ -1,11 +1,11 @@
-use failure::format_err;
+use failure::{format_err, Error};
 use fraction::Fraction;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct MediaTime(time::Duration);
 
 impl MediaTime {
-    pub fn from_rational(timestamp: i64, base: Fraction) -> Result<MediaTime, failure::Error> {
+    pub fn from_rational(timestamp: i64, base: Fraction) -> Result<MediaTime, Error> {
         let num: u64 = *base
             .numer()
             .ok_or_else(|| format_err!("time base of unusable format"))?;

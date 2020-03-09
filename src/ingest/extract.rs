@@ -1,5 +1,6 @@
-use failure::format_err;
 use std::path::Path;
+
+use failure::{format_err, Error};
 
 use crate::ffmpeg_api::api::*;
 use crate::ffmpeg_api::enums::*;
@@ -14,7 +15,7 @@ pub fn extract(
     frame_interval: MediaTime,
     input_file: &Path,
     output_folder: &Path,
-) -> Result<(), failure::Error> {
+) -> Result<(), Error> {
     let mut avformat_context = AVFormatContext::new()
         .map_err(|error| format_err!("Could not open video input: {}", error))?;
     avformat_context
@@ -48,19 +49,19 @@ pub fn extract(
     let time_base = stream.time_base();
 
     let codec_parameters = stream.codec_parameters()?;
-    let local_codec = codec_parameters.find_decoder();
+    let local_codec = codec_parameters.find_decoder()?;
 
     println!(
         "Stream #{}, type: {:#?}, codec: {:#?}",
         index,
         codec_parameters.codec_type(),
-        local_codec.name()
+        local_codec.name()?
     );
 
     let mut metadata = StreamMetadata::new(
         avformat_context
             .input_format()?
-            .determine_mime(local_codec.name())?,
+            .determine_mime(local_codec.name()?)?,
         duration,
         codec_parameters.bit_rate() / 1000,
     );
