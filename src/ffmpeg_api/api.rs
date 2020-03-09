@@ -130,7 +130,8 @@ impl<'a> AVInputFormat<'a> {
 
         for container in containers.split(",") {
             match (container, stream_codec) {
-                ("mp4", "h264") => return Ok("video/mp4"),
+                ("mp4", "h264") | ("mp4", "hevc") => return Ok("video/mp4"),
+                ("matroska", "h264") | ("matroska", "hevc") => return Ok("video/x-matroska"),
                 ("webm", "vp8") | ("webm", "vp9") | ("webm", "av1") => return Ok("video/webm"),
                 _ => {}
             }
