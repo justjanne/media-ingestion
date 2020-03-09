@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use failure::{format_err, Error};
+use image::ImageOutputFormat;
 
 use crate::ffmpeg_api::api::*;
 use crate::ffmpeg_api::enums::*;
@@ -15,7 +16,7 @@ pub fn extract(
     frame_interval: MediaTime,
     input_file: &Path,
     output_folder: &Path,
-    format: impl AsRef<str>,
+    format: ImageOutputFormat,
     scaler: SwsScaler,
     flags: SwsFlags,
 ) -> Result<(), Error> {

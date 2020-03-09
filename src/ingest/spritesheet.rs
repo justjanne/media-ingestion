@@ -1,10 +1,17 @@
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::PathBuf;
 
 use failure::{bail, format_err, Error};
-use image::{ImageBuffer, RgbImage};
+use image::{DynamicImage, ImageOutputFormat, RgbImage};
 
 use crate::util::media_time::MediaTime;
 use crate::util::webvtt::{WebVTTCue, WebVTTFile};
+
+pub enum ImageFormat {
+    Jpeg(i32),
+    Png,
+}
 
 pub struct SpritesheetManager {
     num_horizontal: u32,
@@ -19,7 +26,7 @@ pub struct SpritesheetManager {
     metadata: WebVTTFile,
     output_path: PathBuf,
     name: String,
-    format: String,
+    format: ImageOutputFormat,
     initialized: bool,
 }
 
@@ -31,7 +38,7 @@ impl SpritesheetManager {
         frame_interval: MediaTime,
         output_path: impl Into<PathBuf>,
         name: impl AsRef<str>,
-        format: impl AsRef<str>,
+        format: ImageOutputFormat,
     ) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,
@@ -39,14 +46,14 @@ impl SpritesheetManager {
             max_side,
             sprite_width: 0,
             sprite_height: 0,
-            spritesheet: ImageBuffer::new(0, 0),
+            spritesheet: RgbImage::new(0, 0),
             current_image: 0,
             last_timestamp: MediaTime::from_millis(0),
             frame_interval,
             metadata: WebVTTFile::new(),
             output_path: output_path.into(),
             name: String::from(name.as_ref()),
-            format: String::from(format.as_ref()),
+            format,
             initialized: false,
         }
     }
@@ -59,15 +66,15 @@ impl SpritesheetManager {
             self.sprite_height = self.max_side;
             self.sprite_width = self.sprite_height * width / height;
         }
-        self.reinit_buffer();
+        self.spritesheet = self.reinit_buffer();
         self.initialized = true;
     }
 
-    fn reinit_buffer(&mut self) {
-        self.spritesheet = ImageBuffer::new(
+    fn reinit_buffer(&self) -> RgbImage {
+        RgbImage::new(
             self.sprite_width * self.num_horizontal,
             self.sprite_height * self.num_vertical,
-        );
+        )
     }
 
     pub fn initialized(&self) -> bool {
@@ -93,6 +100,15 @@ impl SpritesheetManager {
     fn x(&self, current: u32) -> u32 {
         let index = current % self.num_horizontal;
         index * self.sprite_width
+    }
+
+    fn ending(&self) -> String {
+        String::from(match self.format {
+            ImageOutputFormat::Png => "png",
+            ImageOutputFormat::Jpeg(_) => "jpeg",
+            ImageOutputFormat::Bmp => "bmp",
+            _ => panic!("Invalid image format: {:?}", self.format),
+        })
     }
 
     fn y(&self, current: u32) -> u32 {
@@ -141,7 +157,7 @@ impl SpritesheetManager {
                 "{}_{}.{}#xywh={},{},{},{}",
                 self.name,
                 self.spritesheet_index(self.current_image - 1),
-                self.format,
+                self.ending(),
                 self.x(self.current_image - 1),
                 self.y(self.current_image - 1),
                 self.sprite_width,
@@ -151,15 +167,21 @@ impl SpritesheetManager {
     }
 
     fn save_spritesheet(&mut self) -> Result<(), Error> {
-        self.spritesheet
-            .save(self.output_path.join(format!(
-                "{}_{}.{}",
-                self.name,
-                self.spritesheet_index(self.current_image),
-                self.format
-            )))
-            .map_err(|error| format_err!("Could not write spritesheet: {}", error))?;
-        self.reinit_buffer();
+        let name = format!(
+            "{}_{}.{}",
+            self.name,
+            self.spritesheet_index(self.current_image),
+            self.ending(),
+        );
+
+        let file = File::create(self.output_path.join(&name))
+            .map_err(|err| format_err!("Could not create spritesheet {}: {}", &name, err))?;
+
+        let new_buffer = self.reinit_buffer();
+        DynamicImage::ImageRgb8(std::mem::replace(&mut self.spritesheet, new_buffer))
+            .write_to(&mut BufWriter::new(file), self.format.clone())
+            .map_err(|err| format_err!("Could not write spritesheet {}: {}", &name, err))?;
+
         Ok(())
     }
 

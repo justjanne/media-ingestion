@@ -11,6 +11,7 @@ use structopt::StructOpt;
 
 use crate::ffmpeg_api::enums::{SwsFlags, SwsScaler};
 use crate::util::media_time::MediaTime;
+use image::ImageOutputFormat;
 
 fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
     match src {
@@ -40,10 +41,12 @@ struct Options {
     num_horizontal: u32,
     #[structopt(long = "num-vertical", default_value = "5")]
     num_vertical: u32,
-    #[structopt(long = "max-size", default_value = "160")]
+    #[structopt(long = "max-size", default_value = "240")]
     max_size: u32,
-    #[structopt(long = "format", default_value = "png")]
+    #[structopt(long = "format", default_value = "jpg")]
     format: String,
+    #[structopt(long = "quality", default_value = "90")]
+    quality: u8,
     #[structopt(long = "scaler", default_value = "area", parse(try_from_str = parse_scaler))]
     scaler: SwsScaler,
     #[structopt(long = "fast-chroma")]
@@ -75,7 +78,12 @@ fn main() -> Result<(), Error> {
         MediaTime::from_seconds(options.frame_interval),
         Path::new(&options.input),
         Path::new(&options.output),
-        options.format,
+        match options.format.as_str() {
+            "jpeg" | "jpg" => ImageOutputFormat::Jpeg(options.quality),
+            "png" => ImageOutputFormat::Png,
+            "bmp" => ImageOutputFormat::Bmp,
+            _ => panic!("Unsupported image format: {}", options.format),
+        },
         options.scaler,
         flags,
     )?;
