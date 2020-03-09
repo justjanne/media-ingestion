@@ -18,7 +18,8 @@ pub struct SpritesheetManager {
     frame_interval: MediaTime,
     metadata: WebVTTFile,
     output_path: PathBuf,
-    name: std::string::String,
+    name: String,
+    format: String,
     initialized: bool,
 }
 
@@ -30,6 +31,7 @@ impl SpritesheetManager {
         frame_interval: MediaTime,
         output_path: impl Into<PathBuf>,
         name: impl AsRef<str>,
+        format: impl AsRef<str>
     ) -> SpritesheetManager {
         SpritesheetManager {
             num_horizontal,
@@ -43,7 +45,8 @@ impl SpritesheetManager {
             frame_interval,
             metadata: WebVTTFile::new(),
             output_path: output_path.into(),
-            name: std::string::String::from(name.as_ref()),
+            name: String::from(name.as_ref()),
+            format: String::from(format.as_ref()),
             initialized: false,
         }
     }
@@ -135,9 +138,10 @@ impl SpritesheetManager {
             self.last_timestamp,
             timestamp,
             format!(
-                "{}_{}.jpg#xywh={},{},{},{}",
+                "{}_{}.{}#xywh={},{},{},{}",
                 self.name,
                 self.spritesheet_index(self.current_image - 1),
+                self.format,
                 self.x(self.current_image - 1),
                 self.y(self.current_image - 1),
                 self.sprite_width,
@@ -149,9 +153,10 @@ impl SpritesheetManager {
     fn save_spritesheet(&mut self) -> Result<(), Error> {
         self.spritesheet
             .save(self.output_path.join(format!(
-                "{}_{}.jpg",
+                "{}_{}.{}",
                 self.name,
-                self.spritesheet_index(self.current_image)
+                self.spritesheet_index(self.current_image),
+                self.format
             )))
             .map_err(|error| format_err!("Could not write spritesheet: {}", error))?;
         self.reinit_buffer();
