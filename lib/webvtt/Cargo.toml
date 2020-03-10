@@ -1,0 +1,10 @@
+[package]
+name = "webvtt"
+version = "0.1.0"
+authors = ["Janne Mareike Koschinski <janne@kuschku.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+media_time = { path = "../media_time" }

@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use failure::{bail, format_err, Error};
 use image::{DynamicImage, ImageOutputFormat, RgbImage};
 
-use crate::util::media_time::MediaTime;
-use crate::util::webvtt::{WebVTTCue, WebVTTFile};
+use media_time::MediaTime;
+use webvtt::{WebVTTCue, WebVTTFile};
 
 pub enum ImageFormat {
     Jpeg(i32),

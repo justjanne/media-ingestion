@@ -1,17 +1,10 @@
-#![allow(dead_code)]
-
-pub(crate) mod ffmpeg_api;
-pub(crate) mod ingest;
-pub(crate) mod util;
-
 use std::path::Path;
 
 use failure::Error;
-use structopt::StructOpt;
-
-use crate::ffmpeg_api::enums::{SwsFlags, SwsScaler};
-use crate::util::media_time::MediaTime;
+use ffmpeg_api::enums::{SwsFlags, SwsScaler};
 use image::ImageOutputFormat;
+use media_time::MediaTime;
+use structopt::StructOpt;
 
 fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
     match src {
@@ -71,7 +64,7 @@ fn main() -> Result<(), Error> {
         flags |= SwsFlags::BIT_EXACT_SCALING;
     }
 
-    ingest::extract::extract(
+    media_ingestion::extract(
         options.max_size,
         options.num_horizontal,
         options.num_vertical,

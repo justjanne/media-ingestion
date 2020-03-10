@@ -6,8 +6,7 @@ use failure::{bail, format_err, Error};
 use ffmpeg_dev::sys as ffi;
 use fraction::Fraction;
 
-use crate::ffmpeg_api::enums::*;
-use crate::util::media_time;
+use crate::enums::*;
 
 fn native_string(ptr: *const std::os::raw::c_char) -> Result<String, Error> {
     if ptr.is_null() {
@@ -96,6 +95,7 @@ impl AVFormatContext {
             unsafe { (*self.base).duration },
             Fraction::new(1 as u64, ffi::AV_TIME_BASE as u64),
         )
+        .map_err(|err| format_err!("error extracting duration: {}", err))
     }
 }
 
@@ -343,6 +343,7 @@ impl<'a> AVStream<'a> {
 
     pub fn timestamp(&self, timestamp: i64) -> Result<media_time::MediaTime, Error> {
         media_time::MediaTime::from_rational(timestamp, self.time_base())
+            .map_err(|err| format_err!("error extracting timestamp: {}", err))
     }
 
     pub fn duration(&self) -> Result<media_time::MediaTime, Error> {

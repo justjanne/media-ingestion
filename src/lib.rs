@@ -1,19 +1,19 @@
+#![allow(dead_code)]
+pub mod spritesheet;
+pub mod stream_metadata;
+
 use std::path::Path;
 
 use failure::{format_err, Error};
+use ffmpeg_api::api::*;
+use ffmpeg_api::enums::*;
 use image::ImageOutputFormat;
-
-use crate::ffmpeg_api::api::*;
-use crate::ffmpeg_api::enums::*;
-use crate::ingest::spritesheet::*;
-use crate::util::media_time::*;
-use crate::util::stream_metadata::*;
 
 pub fn extract(
     max_size: u32,
     num_horizontal: u32,
     num_vertical: u32,
-    frame_interval: MediaTime,
+    frame_interval: media_time::MediaTime,
     input_file: &Path,
     output_folder: &Path,
     format: ImageOutputFormat,
@@ -29,7 +29,7 @@ pub fn extract(
 
     let spritesheet_path = output_folder.join("spritesheets");
     std::fs::create_dir_all(&spritesheet_path)?;
-    let mut spritesheet_manager = SpritesheetManager::new(
+    let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
         max_size,
         num_horizontal,
         num_vertical,
@@ -63,7 +63,7 @@ pub fn extract(
         local_codec.name()?
     );
 
-    let mut metadata = StreamMetadata::new(
+    let mut metadata = stream_metadata::StreamMetadata::new(
         avformat_context
             .input_format()?
             .determine_mime(local_codec.name()?)?,
@@ -98,7 +98,7 @@ pub fn extract(
                     .in_packet(&mut packet)
                     .map_err(|error| format_err!("Could not load packet: {}", error))?;
                 while codec_context.out_frame(&mut frame).is_ok() {
-                    let timestamp = MediaTime::from_rational(frame.pts(), time_base)?;
+                    let timestamp = media_time::MediaTime::from_rational(frame.pts(), time_base)?;
 
                     println!(
                         "Frame {}: {} @ {}",

@@ -4,7 +4,9 @@ use std::io::LineWriter;
 use std::path::Path;
 use std::string::String;
 
-use crate::util::media_time::MediaTime;
+use media_time::MediaTime;
+
+type Result<T> = std::result::Result<T, std::io::Error>;
 
 pub struct WebVTTFile {
     cues: Vec<WebVTTCue>,
@@ -25,7 +27,7 @@ impl WebVTTFile {
         self.cues.push(cue);
     }
 
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         let file = File::create(path)?;
         let mut file = LineWriter::new(file);
         file.write_all(b"WEBVTT\n\n")?;
@@ -46,7 +48,7 @@ impl WebVTTCue {
         }
     }
 
-    fn save(&self, writer: &mut LineWriter<File>) -> Result<(), std::io::Error> {
+    fn save(&self, writer: &mut LineWriter<File>) -> Result<()> {
         writer.write_all(format!("{} --> {}\n", self.start, self.end).as_bytes())?;
         writer.write_all(self.payload.as_bytes())?;
         writer.write_all(b"\n\n")?;

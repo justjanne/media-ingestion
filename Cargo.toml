@@ -17,13 +17,13 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags = "1.2.1"
-enum_primitive = "0.1.1"
 failure = "0.1.6"
-ffmpeg-dev = "0.3.8"
 fraction = "0.6.2"
 image = "0.23.0"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 structopt = "0.3"
-time = "0.2"
+
+ffmpeg_api = { path = "lib/ffmpeg_api" }
+media_time = { path = "lib/media_time" }
+webvtt = { path = "lib/webvtt" }

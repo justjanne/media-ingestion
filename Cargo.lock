@@ -8,9 +8,9 @@ checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.8"
+version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "743ad5a418686aad3b87fd14c43badd828cf26e214a00f92a384291cf22e1811"
+checksum = "8716408b8bc624ed7f65d223ddb9ac2d044c0547b6fa4b0d554f3a9540496ada"
 dependencies = [
  "memchr",
 ]
@@ -288,6 +288,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ffmpeg_api"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "enum_primitive",
+ "failure",
+ "ffmpeg-dev",
+ "fraction",
+ "media_time",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -454,23 +466,30 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 name = "media-ingestion"
 version = "0.1.0"
 dependencies = [
- "bitflags",
- "enum_primitive",
  "failure",
- "ffmpeg-dev",
+ "ffmpeg_api",
  "fraction",
  "image",
+ "media_time",
  "serde",
  "serde_json",
  "structopt",
+ "webvtt",
+]
+
+[[package]]
+name = "media_time"
+version = "0.1.0"
+dependencies = [
+ "fraction",
  "time",
 ]
 
 [[package]]
 name = "memchr"
-version = "2.3.2"
+version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53445de381a1f436797497c61d851644d0e8e88e6140f22872ad33a704933978"
+checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 
 [[package]]
 name = "memoffset"
@@ -719,9 +738,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.14"
+version = "0.6.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b28dfe3fe9badec5dbf0a79a9cccad2cfc2ab5484bdb3e44cbd1ae8b3ba2be06"
+checksum = "1132f845907680735a84409c3bebc64d1364a5683ffbce899550cd09d5eaefc1"
 
 [[package]]
 name = "rustc-demangle"
@@ -1010,10 +1029,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "078775d0255232fb988e6fccf26ddc9d1ac274299aaedcedce21c6f72cc533ce"
 
 [[package]]
+name = "webvtt"
+version = "0.1.0"
+dependencies = [
+ "media_time",
+]
+
+[[package]]
 name = "which"
-version = "3.1.0"
+version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5475d47078209a02e60614f7ba5e645ef3ed60f771920ac1906d7c1cc65024c8"
+checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
 dependencies = [
  "libc",
 ]

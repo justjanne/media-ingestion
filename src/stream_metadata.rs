@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::util::media_time::MediaTime;
+use media_time::MediaTime;
 
 #[derive(Serialize, Deserialize)]
 pub struct StreamMetadata {
