@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+
 pub mod spritesheet;
 pub mod stream_metadata;
 
@@ -40,7 +41,8 @@ pub fn extract(
     );
 
     let mut stream: AVStream = avformat_context
-        .find_stream(|stream| {
+        .streams()
+        .find(|stream| {
             if let Ok(codec_parameters) = stream.codec_parameters() {
                 return codec_parameters.codec_type() == AVMediaType::Video;
             }

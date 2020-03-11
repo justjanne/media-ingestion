@@ -60,27 +60,13 @@ impl AVFormatContext {
         Ok(AVInputFormat::new(base))
     }
 
-    pub fn streams(&self) -> Vec<AVStream> {
-        Vec::from(unsafe {
+    pub fn streams(&self) -> impl Iterator<Item = AVStream> {
+        unsafe {
             std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
-        })
+        }
         .iter()
         .filter_map(|stream: &*mut ffi::AVStream| unsafe { (*stream).as_mut() })
         .map(|stream| AVStream::new(stream))
-        .collect()
-    }
-
-    pub fn find_stream<P>(&self, predicate: P) -> Option<AVStream>
-    where
-        P: FnMut(&AVStream) -> bool,
-    {
-        Vec::from(unsafe {
-            std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
-        })
-        .iter()
-        .filter_map(|stream: &*mut ffi::AVStream| unsafe { (*stream).as_mut() })
-        .map(|stream| AVStream::new(stream))
-        .find(predicate)
     }
 
     pub fn read_frame(&mut self, packet: &mut AVPacket) -> Result<(), Error> {
