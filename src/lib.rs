@@ -151,7 +151,7 @@ pub fn extract(
     }
 
     metadata
-        .save(output_folder.join("metadata.json"))
+        .save(output_folder.join("media.json"))
         .map_err(|error| format_err!("Could not write stream metadata: {}", error))?;
 
     Ok(())
