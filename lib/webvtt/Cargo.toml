@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 media_time = { path = "../media_time" }
+thiserror = "1.0"

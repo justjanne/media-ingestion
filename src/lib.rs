@@ -5,7 +5,7 @@ pub mod stream_metadata;
 
 use std::path::Path;
 
-use failure::{format_err, Error};
+use anyhow::format_err;
 use ffmpeg_api::api::*;
 use ffmpeg_api::enums::*;
 use image::ImageOutputFormat;
@@ -20,12 +20,9 @@ pub fn extract(
     format: ImageOutputFormat,
     scaler: SwsScaler,
     flags: SwsFlags,
-) -> Result<(), Error> {
-    let mut avformat_context = AVFormatContext::new()
-        .map_err(|error| format_err!("Could not open video input: {}", error))?;
-    avformat_context
-        .open_input(input_file)
-        .map_err(|error| format_err!("Could not open video input: {}", error))?;
+) -> anyhow::Result<()> {
+    let mut avformat_context = AVFormatContext::new()?;
+    avformat_context.open_input(input_file)?;
     let duration = avformat_context.duration()?;
 
     let spritesheet_path = output_folder.join("spritesheets");
@@ -100,7 +97,7 @@ pub fn extract(
                     .in_packet(&mut packet)
                     .map_err(|error| format_err!("Could not load packet: {}", error))?;
                 while codec_context.out_frame(&mut frame).is_ok() {
-                    let timestamp = media_time::MediaTime::from_rational(frame.pts(), time_base)?;
+                    let timestamp = media_time::MediaTime::from_rational(frame.pts(), &time_base)?;
 
                     println!(
                         "Frame {}: {} @ {}",

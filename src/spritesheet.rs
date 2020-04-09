@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 
-use failure::{bail, format_err, Error};
+use anyhow::{bail, format_err, Error};
 use image::{DynamicImage, ImageOutputFormat, RgbImage};
 
 use media_time::MediaTime;

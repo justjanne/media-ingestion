@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use failure::Error;
 use ffmpeg_api::enums::{SwsFlags, SwsScaler};
 use image::ImageOutputFormat;
 use media_time::MediaTime;
@@ -50,7 +49,7 @@ struct Options {
     fast_scaling: bool,
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> anyhow::Result<()> {
     let options = Options::from_args();
 
     let mut flags = SwsFlags::empty();
@@ -64,7 +63,7 @@ fn main() -> Result<(), Error> {
         flags |= SwsFlags::BIT_EXACT_SCALING;
     }
 
-    media_ingestion::extract(
+    if let Err(err) = media_ingestion::extract(
         options.max_size,
         options.num_horizontal,
         options.num_vertical,
@@ -79,7 +78,9 @@ fn main() -> Result<(), Error> {
         },
         options.scaler,
         flags,
-    )?;
+    ) {
+        eprintln!("Error: {}", err)
+    }
 
     Ok(())
 }

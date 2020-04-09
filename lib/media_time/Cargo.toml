@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 fraction = "0.6.2"
 time = "0.2"
+thiserror = "1.0"

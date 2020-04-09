@@ -1,15 +1,26 @@
-use crate::errors::TimeBaseError;
 use fraction::Fraction;
+use thiserror::Error;
 
-type Result<T> = std::result::Result<T, TimeBaseError>;
+#[derive(Error, Debug)]
+pub enum MediaTimeError {
+    #[error("missing numerator in timebase")]
+    TimebaseNumeratorMissing,
+    #[error("missing denominator in timebase")]
+    TimebaseDenominatorMissing,
+    #[error("invalid denominator in timebase")]
+    TimebaseDenominatorInvalid,
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct MediaTime(time::Duration);
 
 impl MediaTime {
-    pub fn from_rational(timestamp: i64, base: Fraction) -> Result<MediaTime> {
-        let num: u64 = *base.numer().ok_or(TimeBaseError)?;
-        let den: u64 = *base.denom().ok_or(TimeBaseError)?;
+    pub fn from_rational(timestamp: i64, base: &Fraction) -> Result<MediaTime, MediaTimeError> {
+        let num: u64 = *base.numer().ok_or(MediaTimeError::TimebaseNumeratorMissing)?;
+        let den: u64 = *base.denom().ok_or(MediaTimeError::TimebaseDenominatorMissing)?;
+        if den == 0 {
+            return Err(MediaTimeError::TimebaseDenominatorInvalid)
+        }
 
         Ok(MediaTime(time::Duration::milliseconds(
             (1000 * timestamp as i128 * num as i128 / den as i128) as i64,
