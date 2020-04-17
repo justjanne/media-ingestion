@@ -46,6 +46,21 @@ impl MediaTime {
     pub fn seconds(&self) -> i64 {
         self.0.whole_seconds()
     }
+
+    #[inline(always)]
+    pub fn milliseconds(&self) -> i128 {
+        self.0.whole_milliseconds()
+    }
+
+    #[inline(always)]
+    pub fn microseconds(&self) -> i128 {
+        self.0.whole_microseconds()
+    }
+
+    #[inline(always)]
+    pub fn nanoseconds(&self) -> i128 {
+        self.0.whole_nanoseconds()
+    }
 }
 
 impl std::fmt::Display for MediaTime {
