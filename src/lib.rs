@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 pub mod spritesheet;
-pub mod stream_metadata;
 
 use std::path::Path;
 
@@ -62,14 +61,6 @@ pub fn extract(
         local_codec.name()?
     );
 
-    let mut metadata = stream_metadata::StreamMetadata::new(
-        avformat_context
-            .input_format()?
-            .determine_mime(local_codec.name()?)?,
-        duration,
-        codec_parameters.bit_rate() / 1000,
-    );
-
     let mut output_frame =
         AVFrame::new().map_err(|error| format_err!("Could not create output frame: {}", error))?;
 
@@ -110,7 +101,6 @@ pub fn extract(
                         if !spritesheet_manager.initialized() {
                             spritesheet_manager
                                 .initialize(frame.width() as u32, frame.height() as u32);
-                            metadata.set_frame_size(frame.width(), frame.height());
                             output_frame
                                 .init(
                                     spritesheet_manager.sprite_width() as i32,
@@ -146,10 +136,6 @@ pub fn extract(
         spritesheet_manager.end_frame(duration);
         spritesheet_manager.save()?;
     }
-
-    metadata
-        .save(output_folder.join("media.json"))
-        .map_err(|error| format_err!("Could not write stream metadata: {}", error))?;
 
     Ok(())
 }
