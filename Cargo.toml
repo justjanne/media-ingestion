@@ -17,12 +17,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0"
-fraction = "0.6"
-image = "0.23"
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-structopt = "0.3"
+anyhow = "1.0.32"
+fraction = "0.6.3"
+image = "0.23.9"
+serde_json = "1.0.57"
+serde = { version = "1.0.116", features = ["derive"] }
+structopt = "0.3.18"
 
 ffmpeg_api = { path = "lib/ffmpeg_api" }
 media_time = { path = "lib/media_time" }
