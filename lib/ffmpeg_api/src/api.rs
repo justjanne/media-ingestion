@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use ffmpeg_dev::sys as ffi;
 use fraction::Fraction;
-use num_traits::FromPrimitive;
 use media_time::MediaTimeError;
+use num_traits::FromPrimitive;
 use thiserror::Error;
 
 use crate::enums::*;
@@ -21,7 +21,7 @@ pub enum StringError {
     #[error("String is unexpectedly null")]
     NullError,
     #[error(transparent)]
-    Utf8Error(#[from] std::str::Utf8Error)
+    Utf8Error(#[from] std::str::Utf8Error),
 }
 
 fn native_string(ptr: *const std::os::raw::c_char) -> Result<String, StringError> {
@@ -48,7 +48,7 @@ pub enum AVFormatContextError {
     #[error("Path {0} contains null byte")]
     PathContainsNull(PathBuf, #[source] std::ffi::NulError),
     #[error("Opening media file {0} failed")]
-    OpenInputFailed(PathBuf, #[source] AVError)
+    OpenInputFailed(PathBuf, #[source] AVError),
 }
 
 impl AVFormatContext {
@@ -58,7 +58,7 @@ impl AVFormatContext {
             Err(AVAllocError::AllocFailed("AVFormatContext".to_string()))
         } else {
             Ok(AVFormatContext { base })
-        }
+        };
     }
 
     pub fn open_input(&mut self, path: &Path) -> Result<(), AVFormatContextError> {
@@ -85,16 +85,17 @@ impl AVFormatContext {
         Ok(AVInputFormat::new(base))
     }
 
-    pub fn streams(&self) -> impl Iterator<Item = AVStream> {
+    pub fn streams(&self) -> impl Iterator<Item=AVStream> {
         unsafe {
             std::slice::from_raw_parts((*self.base).streams, (*self.base).nb_streams as usize)
         }
-        .iter()
-        .filter_map(|stream: &*mut ffi::AVStream| unsafe { (*stream).as_mut() })
-        .map(|stream| AVStream::new(stream))
+            .iter()
+            .filter_map(|stream: &*mut ffi::AVStream| unsafe { (*stream).as_mut() })
+            .map(|stream| AVStream::new(stream))
     }
 
     pub fn read_frame(&mut self, packet: &mut AVPacket) -> Result<(), AVFrameError> {
+        unsafe { ffi::av_packet_unref(packet.base) }
         AVError::from_errno(unsafe { ffi::av_read_frame(self.base, packet.base) })
             .map_err(|err| AVFrameError::DecodingFailed(packet.stream_index(), packet.pts(), err))
     }
@@ -171,7 +172,7 @@ impl AVBuffer {
             Err(AVAllocError::AllocFailed("AVBufferContext".to_string()))
         } else {
             Ok(AVBuffer { base, size })
-        }
+        };
     }
 
     pub fn empty() -> Self {
@@ -187,6 +188,14 @@ impl AVBuffer {
 
     pub fn data_mut(&mut self) -> &[u8] {
         unsafe { std::slice::from_raw_parts_mut(self.base, self.size) }
+    }
+}
+
+impl Drop for AVBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::av_free(self.base as *mut std::ffi::c_void)
+        }
     }
 }
 
@@ -207,7 +216,7 @@ impl AVPacket {
             Err(AVAllocError::AllocFailed("AVPacket".to_string()))
         } else {
             Ok(AVPacket { base })
-        }
+        };
     }
 
     fn as_ref(&self) -> &ffi::AVPacket {
@@ -229,7 +238,10 @@ impl AVPacket {
 
 impl Drop for AVPacket {
     fn drop(&mut self) {
-        unsafe { ffi::av_packet_free(&mut self.base) }
+        unsafe {
+            ffi::av_packet_unref(self.base);
+            ffi::av_packet_free(&mut self.base);
+        }
     }
 }
 
@@ -243,7 +255,7 @@ pub enum AVFrameError {
     #[error(transparent)]
     AllocFailed(#[from] AVAllocError),
     #[error("Decoding a frame from packet of stream {0} at timestamp {1} failed")]
-    DecodingFailed(i32, i64, #[source] AVError)
+    DecodingFailed(i32, i64, #[source] AVError),
 }
 
 impl AVFrame {
@@ -252,8 +264,8 @@ impl AVFrame {
         return if base.is_null() {
             Err(AVAllocError::AllocFailed("AVFrame".to_string()))
         } else {
-            Ok(AVFrame { base, buffer: AVBuffer::empty(), })
-        }
+            Ok(AVFrame { base, buffer: AVBuffer::empty() })
+        };
     }
 
     pub fn init(&mut self, width: i32, height: i32, format: AVPixelFormat) -> Result<(), AVFrameError> {
@@ -345,7 +357,10 @@ impl AVFrame {
 
 impl Drop for AVFrame {
     fn drop(&mut self) {
-        unsafe { ffi::av_frame_free(&mut self.base) }
+        unsafe {
+            ffi::av_frame_unref(self.base);
+            ffi::av_frame_free(&mut self.base);
+        }
     }
 }
 
@@ -511,7 +526,8 @@ impl AVCodecContext {
     }
 
     pub fn out_frame(&mut self, frame: &mut AVFrame) -> Result<(), AVCodecContextError> {
-        AVError::from_errno( unsafe { ffi::avcodec_receive_frame(self.base, frame.base) })
+        unsafe { ffi::av_frame_unref(frame.base) }
+        AVError::from_errno(unsafe { ffi::avcodec_receive_frame(self.base, frame.base) })
             .map_err(|err| AVCodecContextError::FrameError(err))
     }
 
