@@ -2,9 +2,8 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, Error, format_err};
 use image::{DynamicImage, ImageOutputFormat, RgbImage};
-
 use media_time::MediaTime;
 use webvtt::{WebVTTCue, WebVTTFile};
 
@@ -150,16 +149,22 @@ impl SpritesheetManager {
     }
 
     pub fn end_frame(&mut self, timestamp: MediaTime) {
+        let prev_image = if self.current_image > 0 {
+            self.current_image - 1
+        } else {
+            0
+        };
+
         self.metadata.add(WebVTTCue::new(
             self.last_timestamp,
             timestamp,
             format!(
                 "{}_{}.{}#xywh={},{},{},{}",
                 self.name,
-                self.spritesheet_index(self.current_image - 1),
+                self.spritesheet_index(prev_image),
                 self.ending(),
-                self.x(self.current_image - 1),
-                self.y(self.current_image - 1),
+                self.x(prev_image),
+                self.y(prev_image),
                 self.sprite_width,
                 self.sprite_height
             ),
