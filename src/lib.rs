@@ -24,14 +24,13 @@ pub fn extract(
     avformat_context.open_input(input_file)?;
     let duration = avformat_context.duration()?;
 
-    let spritesheet_path = output_folder.join("spritesheets");
-    std::fs::create_dir_all(&spritesheet_path)?;
+    std::fs::create_dir_all(&output_folder)?;
     let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
         max_size,
         num_horizontal,
         num_vertical,
         frame_interval,
-        spritesheet_path,
+        output_folder,
         "preview",
         format,
     );
