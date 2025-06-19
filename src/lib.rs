@@ -1,22 +1,20 @@
 #![allow(dead_code)]
 
 pub mod spritesheet;
+mod options;
 
 use std::path::Path;
 
 use anyhow::format_err;
 use ffmpeg_api::api::*;
 use ffmpeg_api::enums::*;
-use image::ImageFormat as ImageOutputFormat;
+pub use options::ExtractOptions;
 
+#[allow(clippy::too_many_arguments)]
 pub fn extract(
-    max_size: u32,
-    num_horizontal: u32,
-    num_vertical: u32,
-    frame_interval: media_time::MediaTime,
     input_file: &Path,
     output_folder: &Path,
-    format: ImageOutputFormat,
+    options: ExtractOptions,
     scaler: SwsScaler,
     flags: SwsFlags,
 ) -> anyhow::Result<()> {
@@ -24,15 +22,11 @@ pub fn extract(
     avformat_context.open_input(input_file)?;
     let duration = avformat_context.duration()?;
 
-    std::fs::create_dir_all(&output_folder)?;
+    std::fs::create_dir_all(output_folder)?;
     let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
-        max_size,
-        num_horizontal,
-        num_vertical,
-        frame_interval,
+        options,
         output_folder,
         "preview",
-        format,
     );
 
     let mut stream: AVStream = avformat_context

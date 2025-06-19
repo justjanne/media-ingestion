@@ -6,6 +6,7 @@ use anyhow::{bail, Error, format_err};
 use image::{DynamicImage, ImageFormat as ImageOutputFormat, RgbImage};
 use media_time::MediaTime;
 use webvtt::{WebVTTCue, WebVTTFile};
+use crate::options::ExtractOptions;
 
 pub enum ImageFormat {
     Jpeg(i32),
@@ -31,28 +32,24 @@ pub struct SpritesheetManager {
 
 impl SpritesheetManager {
     pub fn new(
-        max_side: u32,
-        num_horizontal: u32,
-        num_vertical: u32,
-        frame_interval: MediaTime,
+        options: ExtractOptions,
         output_path: impl Into<PathBuf>,
         name: impl AsRef<str>,
-        format: ImageOutputFormat,
     ) -> SpritesheetManager {
         SpritesheetManager {
-            num_horizontal,
-            num_vertical,
-            max_side,
+            num_horizontal: options.num_horizontal,
+            num_vertical: options.num_vertical,
+            max_side: options.max_size,
             sprite_width: 0,
             sprite_height: 0,
             spritesheet: RgbImage::new(0, 0),
             current_image: 0,
             last_timestamp: MediaTime::from_millis(0),
-            frame_interval,
+            frame_interval: options.frame_interval,
             metadata: WebVTTFile::new(),
             output_path: output_path.into(),
             name: String::from(name.as_ref()),
-            format,
+            format: options.format,
             initialized: false,
         }
     }
@@ -184,7 +181,7 @@ impl SpritesheetManager {
 
         let new_buffer = self.reinit_buffer();
         DynamicImage::ImageRgb8(std::mem::replace(&mut self.spritesheet, new_buffer))
-            .write_to(&mut BufWriter::new(file), self.format.clone())
+            .write_to(&mut BufWriter::new(file), self.format)
             .map_err(|err| format_err!("Could not write spritesheet {}: {}", &name, err))?;
 
         Ok(())

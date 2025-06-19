@@ -4,6 +4,7 @@ use ffmpeg_api::enums::{SwsFlags, SwsScaler};
 use image::ImageFormat as ImageOutputFormat;
 use media_time::MediaTime;
 use structopt::StructOpt;
+use media_ingestion::ExtractOptions;
 
 fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
     match src {
@@ -62,17 +63,19 @@ fn main() -> anyhow::Result<()> {
     }
 
     if let Err(err) = media_ingestion::extract(
-        options.max_size,
-        options.num_horizontal,
-        options.num_vertical,
-        MediaTime::from_seconds(options.frame_interval),
         Path::new(&options.input),
         Path::new(&options.output),
-        match options.format.as_str() {
-            "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
-            "png" => ImageOutputFormat::Png,
-            "bmp" => ImageOutputFormat::Bmp,
-            _ => panic!("Unsupported image format: {}", options.format),
+        ExtractOptions {
+            max_size: options.max_size,
+            num_horizontal: options.num_horizontal,
+            num_vertical: options.num_vertical,
+            frame_interval: MediaTime::from_seconds(options.frame_interval),
+            format: match options.format.as_str() {
+                "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
+                "png" => ImageOutputFormat::Png,
+                "bmp" => ImageOutputFormat::Bmp,
+                _ => panic!("Unsupported image format: {}", options.format),
+            }
         },
         options.scaler,
         flags,
