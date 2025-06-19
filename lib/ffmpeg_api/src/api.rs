@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use ffmpeg_dev::sys as ffi;
 use fraction::Fraction;
 use media_time::MediaTimeError;
 use num_traits::FromPrimitive;
+use rsmpeg::ffi as ffi;
 use thiserror::Error;
 
 use crate::enums::*;
@@ -79,8 +79,8 @@ impl AVFormatContext {
     }
 
     pub fn input_format(&self) -> Result<AVInputFormat, AVInputFormatError> {
-        let base: &mut ffi::AVInputFormat = unsafe { (*self.base).iformat.as_mut() }
-            .ok_or(AVInputFormatError::Invalid)?;
+        let base: &ffi::AVInputFormat = unsafe { (*self.base).iformat.as_ref() }
+           .ok_or(AVInputFormatError::Invalid)?;
 
         Ok(AVInputFormat::new(base))
     }
@@ -115,7 +115,7 @@ impl Drop for AVFormatContext {
 }
 
 pub struct AVInputFormat<'a> {
-    base: &'a mut ffi::AVInputFormat,
+    base: &'a ffi::AVInputFormat,
 }
 
 #[derive(Error, Debug)]
@@ -129,7 +129,7 @@ pub enum AVInputFormatError {
 }
 
 impl<'a> AVInputFormat<'a> {
-    fn new(base: &'a mut ffi::AVInputFormat) -> Self {
+    fn new(base: &'a ffi::AVInputFormat) -> Self {
         return AVInputFormat { base };
     }
 
@@ -276,13 +276,15 @@ impl AVFrame {
         self.buffer = AVBuffer::new(self.size())?;
 
         unsafe {
-            ffi::avpicture_fill(
-                self.base as *mut ffi::AVPicture,
-                self.buffer.base as *mut u8,
+            ffi::av_image_fill_arrays(
+                (*self.base).data.as_mut_ptr(),
+                (*self.base).linesize.as_mut_ptr(),
+                self.buffer.base,
                 self.format() as ffi::AVPixelFormat,
                 self.width(),
                 self.height(),
-            )
+                1
+            );
         };
 
         Ok(())
@@ -310,10 +312,11 @@ impl AVFrame {
 
     pub fn size(&self) -> usize {
         unsafe {
-            ffi::avpicture_get_size(
+            ffi::av_image_get_buffer_size(
                 self.format() as ffi::AVPixelFormat,
                 self.width(),
                 self.height(),
+                1,
             ) as usize
         }
     }
@@ -411,13 +414,6 @@ impl<'a> AVStream<'a> {
         )
     }
 
-    pub fn display_aspect_ratio(&self) -> Fraction {
-        Fraction::new(
-            self.base.display_aspect_ratio.num as u32,
-            self.base.display_aspect_ratio.den as u32,
-        )
-    }
-
     pub fn codec_parameters(&self) -> Result<AVCodecParameters, AVCodecParametersError> {
         Ok(AVCodecParameters::new(
             unsafe { self.base.codecpar.as_mut() }
@@ -460,7 +456,7 @@ impl<'a> AVCodecParameters<'a> {
 
     pub fn find_decoder(&self) -> Result<AVCodec, AVCodecError> {
         Ok(AVCodec::new(
-            unsafe { ffi::avcodec_find_decoder(self.base.codec_id).as_mut() }
+            unsafe { ffi::avcodec_find_decoder(self.base.codec_id).as_ref() }
                 .ok_or(AVCodecError::Invalid)?,
             self,
         ))
@@ -468,7 +464,7 @@ impl<'a> AVCodecParameters<'a> {
 }
 
 pub struct AVCodec<'a> {
-    base: &'a mut ffi::AVCodec,
+    base: &'a ffi::AVCodec,
     phantom: PhantomData<&'a AVCodecParameters<'a>>,
 }
 
@@ -481,7 +477,7 @@ pub enum AVCodecError {
 }
 
 impl<'a> AVCodec<'a> {
-    fn new(base: &'a mut ffi::AVCodec, _: &'a AVCodecParameters) -> Self {
+    fn new(base: &'a ffi::AVCodec, _: &'a AVCodecParameters) -> Self {
         return AVCodec {
             base,
             phantom: PhantomData,
