@@ -1,6 +1,6 @@
 [package]
 name = "media-ingestion"
-version = "0.2.0"
+version = "1.0.0"
 authors = ["Janne Mareike Koschinski <janne@kuschku.de>"]
 
 description = """
