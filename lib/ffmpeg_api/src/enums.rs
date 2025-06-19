@@ -3,7 +3,7 @@ use rsmpeg::ffi as ffi;
 use num_derive::FromPrimitive;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Copy, Clone)]
     pub struct SwsFlags: u32 {
         const PRINT_INFO = ffi::SWS_PRINT_INFO;
         const FULL_CHROMA_INTERPOLATION = ffi::SWS_FULL_CHR_H_INT;

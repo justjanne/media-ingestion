@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fraction = "0.6"
-time = "0.2"
-thiserror = "1.0"
+fraction = "0.15.3"
+time = "0.3.41"
+thiserror = "2.0.12"

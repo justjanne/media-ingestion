@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::format_err;
 use ffmpeg_api::api::*;
 use ffmpeg_api::enums::*;
-use image::ImageOutputFormat;
+use image::ImageFormat as ImageOutputFormat;
 
 pub fn extract(
     max_size: u32,

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ffmpeg_api::enums::{SwsFlags, SwsScaler};
-use image::ImageOutputFormat;
+use image::ImageFormat as ImageOutputFormat;
 use media_time::MediaTime;
 use structopt::StructOpt;
 
@@ -37,8 +37,6 @@ struct Options {
     max_size: u32,
     #[structopt(long = "format", default_value = "jpg")]
     format: String,
-    #[structopt(long = "quality", default_value = "90")]
-    quality: u8,
     #[structopt(long = "scaler", default_value = "area", parse(try_from_str = parse_scaler))]
     scaler: SwsScaler,
     #[structopt(long = "fast-chroma")]
@@ -71,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         Path::new(&options.input),
         Path::new(&options.output),
         match options.format.as_str() {
-            "jpeg" | "jpg" => ImageOutputFormat::Jpeg(options.quality),
+            "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
             "png" => ImageOutputFormat::Png,
             "bmp" => ImageOutputFormat::Bmp,
             _ => panic!("Unsupported image format: {}", options.format),

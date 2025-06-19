@@ -22,7 +22,6 @@ OPTIONS:
         --max-size <max-size>                 [default: 240]
         --num-horizontal <num-horizontal>     [default: 5]
         --num-vertical <num-vertical>         [default: 5]
-        --quality <quality>                   [default: 90]
         --scaler <scaler>                     [default: area]
 
 ARGS:

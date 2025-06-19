@@ -3,7 +3,7 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 use anyhow::{bail, Error, format_err};
-use image::{DynamicImage, ImageOutputFormat, RgbImage};
+use image::{DynamicImage, ImageFormat as ImageOutputFormat, RgbImage};
 use media_time::MediaTime;
 use webvtt::{WebVTTCue, WebVTTFile};
 
@@ -104,7 +104,7 @@ impl SpritesheetManager {
     fn ending(&self) -> String {
         String::from(match self.format {
             ImageOutputFormat::Png => "png",
-            ImageOutputFormat::Jpeg(_) => "jpeg",
+            ImageOutputFormat::Jpeg => "jpeg",
             ImageOutputFormat::Bmp => "bmp",
             _ => panic!("Invalid image format: {:?}", self.format),
         })
@@ -130,8 +130,8 @@ impl SpritesheetManager {
             )
         }
 
-        let x = self.x(self.current_image);
-        let y = self.y(self.current_image);
+        let x: i64 = self.x(self.current_image).into();
+        let y: i64 = self.y(self.current_image).into();
         image::imageops::overlay(&mut self.spritesheet, &image, x, y);
 
         if self.current_image != 0 {
