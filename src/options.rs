@@ -6,4 +6,5 @@ pub struct ExtractOptions {
     pub num_vertical: u32,
     pub frame_interval: media_time::MediaTime,
     pub format: ImageOutputFormat,
+    pub timelens: bool,
 }

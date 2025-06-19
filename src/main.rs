@@ -29,7 +29,7 @@ struct Options {
     input: String,
     output: String,
     #[structopt(long = "frame-interval", default_value = "2")]
-    frame_interval: i64,
+    frame_interval: f64,
     #[structopt(long = "num-horizontal", default_value = "5")]
     num_horizontal: u32,
     #[structopt(long = "num-vertical", default_value = "5")]
@@ -46,6 +46,8 @@ struct Options {
     fast_rounding: bool,
     #[structopt(long = "fast-scaling")]
     fast_scaling: bool,
+    #[structopt(long = "timelens")]
+    timelens: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -69,13 +71,14 @@ fn main() -> anyhow::Result<()> {
             max_size: options.max_size,
             num_horizontal: options.num_horizontal,
             num_vertical: options.num_vertical,
-            frame_interval: MediaTime::from_seconds(options.frame_interval),
+            frame_interval: MediaTime::from_seconds_f64(options.frame_interval),
             format: match options.format.as_str() {
                 "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
                 "png" => ImageOutputFormat::Png,
                 "bmp" => ImageOutputFormat::Bmp,
                 _ => panic!("Unsupported image format: {}", options.format),
-            }
+            },
+            timelens: options.timelens,
         },
         options.scaler,
         flags,

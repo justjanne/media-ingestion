@@ -23,11 +23,6 @@ pub fn extract(
     let duration = avformat_context.duration()?;
 
     std::fs::create_dir_all(output_folder)?;
-    let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
-        options,
-        output_folder,
-        "preview",
-    );
 
     let mut stream: AVStream = avformat_context
         .streams()
@@ -52,6 +47,14 @@ pub fn extract(
         index,
         codec_parameters.codec_type(),
         local_codec.name()?
+    );
+
+    let frame_count = stream.duration()?.milliseconds() / options.frame_interval.milliseconds();
+    let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
+        options,
+        u32::try_from(frame_count)?,
+        output_folder,
+        "preview",
     );
 
     let mut output_frame =

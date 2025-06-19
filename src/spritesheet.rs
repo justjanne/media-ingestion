@@ -3,7 +3,7 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 
 use anyhow::{bail, Error, format_err};
-use image::{DynamicImage, ImageFormat as ImageOutputFormat, RgbImage};
+use image::{DynamicImage, GenericImageView, ImageFormat as ImageOutputFormat, RgbImage};
 use media_time::MediaTime;
 use webvtt::{WebVTTCue, WebVTTFile};
 use crate::options::ExtractOptions;
@@ -28,17 +28,19 @@ pub struct SpritesheetManager {
     name: String,
     format: ImageOutputFormat,
     initialized: bool,
+    timelens: bool,
 }
 
 impl SpritesheetManager {
     pub fn new(
         options: ExtractOptions,
+        frame_count: u32,
         output_path: impl Into<PathBuf>,
         name: impl AsRef<str>,
     ) -> SpritesheetManager {
         SpritesheetManager {
-            num_horizontal: options.num_horizontal,
-            num_vertical: options.num_vertical,
+            num_horizontal: if options.timelens { frame_count } else { options.num_horizontal },
+            num_vertical: if options.timelens { 1 } else { options.num_vertical },
             max_side: options.max_size,
             sprite_width: 0,
             sprite_height: 0,
@@ -51,11 +53,15 @@ impl SpritesheetManager {
             name: String::from(name.as_ref()),
             format: options.format,
             initialized: false,
+            timelens: options.timelens,
         }
     }
 
     pub fn initialize(&mut self, width: u32, height: u32) {
-        if width >= height {
+        if self.timelens {
+            self.sprite_width = 1;
+            self.sprite_height = self.max_side;
+        } else if width >= height {
             self.sprite_width = self.max_side;
             self.sprite_height = self.sprite_width * height / width;
         } else {
@@ -69,7 +75,7 @@ impl SpritesheetManager {
     fn reinit_buffer(&self) -> RgbImage {
         RgbImage::new(
             self.sprite_width * self.num_horizontal,
-            self.sprite_height * self.num_vertical,
+            self.num_vertical * self.sprite_height,
         )
     }
 
@@ -179,8 +185,14 @@ impl SpritesheetManager {
         let file = File::create(self.output_path.join(&name))
             .map_err(|err| format_err!("Could not create spritesheet {}: {}", &name, err))?;
 
-        let new_buffer = self.reinit_buffer();
-        DynamicImage::ImageRgb8(std::mem::replace(&mut self.spritesheet, new_buffer))
+        let output = if self.timelens {
+            DynamicImage::ImageRgb8(self.spritesheet.view(0, 0, self.current_image, self.sprite_height).to_image())
+        } else {
+            let new_buffer = self.reinit_buffer();
+            DynamicImage::ImageRgb8(std::mem::replace(&mut self.spritesheet, new_buffer))
+        };
+
+        output
             .write_to(&mut BufWriter::new(file), self.format)
             .map_err(|err| format_err!("Could not write spritesheet {}: {}", &name, err))?;
 

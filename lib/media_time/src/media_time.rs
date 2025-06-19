@@ -38,6 +38,11 @@ impl MediaTime {
     }
 
     #[inline(always)]
+    pub fn from_seconds_f64(timestamp: f64) -> MediaTime {
+        MediaTime(time::Duration::seconds_f64(timestamp))
+    }
+
+    #[inline(always)]
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
