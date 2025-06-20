@@ -1,20 +1,21 @@
 #![allow(dead_code)]
 
-pub mod spritesheet;
-mod options;
-
 use std::path::Path;
 
 use anyhow::format_err;
 use ffmpeg_api::api::*;
 use ffmpeg_api::enums::*;
-pub use options::ExtractOptions;
+
+pub mod spritesheet;
+pub mod timelens;
 
 #[allow(clippy::too_many_arguments)]
 pub fn extract(
     input_file: &Path,
     output_folder: &Path,
-    options: ExtractOptions,
+    spritesheet_options: Option<spritesheet::SpritesheetOptions>,
+    timelens_options: Option<timelens::TimelensOptions>,
+    discard: AVDiscard,
     scaler: SwsScaler,
     flags: SwsFlags,
 ) -> anyhow::Result<()> {
@@ -34,7 +35,7 @@ pub fn extract(
             false
         })
         .ok_or_else(|| format_err!("Could not find video stream"))?;
-    stream.set_discard(AVDiscard::NonKey);
+    stream.set_discard(discard);
 
     let index = stream.index();
     let time_base = stream.time_base();
@@ -49,16 +50,26 @@ pub fn extract(
         local_codec.name()?
     );
 
-    let frame_count = stream.duration()?.milliseconds() / options.frame_interval.milliseconds();
-    let mut spritesheet_manager = spritesheet::SpritesheetManager::new(
-        options,
-        u32::try_from(frame_count)?,
-        output_folder,
-        "preview",
-    );
-
-    let mut output_frame =
-        AVFrame::new().map_err(|error| format_err!("Could not create output frame: {}", error))?;
+    let mut spritesheet_manager: Option<spritesheet::SpritesheetManager> = if let Some(options) = spritesheet_options {
+        Some(spritesheet::SpritesheetManager::new(
+            options,
+            output_folder,
+            "preview",
+        )?)
+    } else {
+        None
+    };
+    
+    let mut timelens_manager: Option<timelens::TimelensManager> = if let Some(options) = timelens_options {
+        Some(timelens::TimelensManager::new(
+            options,
+            stream.duration()?,
+            output_folder,
+            "preview",
+        )?)
+    } else {
+        None
+    };
 
     if codec_parameters.codec_type() == AVMediaType::Video {
         let mut codec_context = AVCodecContext::new(&local_codec)
@@ -66,9 +77,9 @@ pub fn extract(
         codec_context.set_parameters(&codec_parameters);
         codec_context.open(&local_codec);
 
-        codec_context.set_skip_loop_filter(AVDiscard::NonKey);
-        codec_context.set_skip_idct(AVDiscard::NonKey);
-        codec_context.set_skip_frame(AVDiscard::NonKey);
+        codec_context.set_skip_loop_filter(discard);
+        codec_context.set_skip_idct(discard);
+        codec_context.set_skip_frame(discard);
 
         let mut packet = AVPacket::new()
             .map_err(|error| format_err!("Could not init temporary packet: {}", error))?;
@@ -92,45 +103,36 @@ pub fn extract(
                         timestamp,
                         frame.key_frame()
                     );
-
-                    if spritesheet_manager.fulfils_frame_interval(timestamp) {
-                        if !spritesheet_manager.initialized() {
-                            spritesheet_manager
-                                .initialize(frame.width() as u32, frame.height() as u32);
-                            output_frame
-                                .init(
-                                    spritesheet_manager.sprite_width() as i32,
-                                    spritesheet_manager.sprite_height() as i32,
-                                    AVPixelFormat::RGB24,
-                                )
-                                .map_err(|error| {
-                                    format_err!("Could not init output frame: {}", error)
-                                })?;
-                            scale_context
-                                .reinit(&frame, &output_frame, scaler, flags)
-                                .map_err(|error| {
-                                    format_err!("Could not reinit scale context: {}", error)
-                                })?;
+                    
+                    if let Some(spritesheet_manager) = &mut spritesheet_manager {
+                        if spritesheet_manager.fulfils_frame_interval(timestamp) {
+                            if !spritesheet_manager.initialized() {
+                                spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32)?;
+                            }
+                            spritesheet_manager.add_frame(&mut scale_context, scaler, flags, timestamp, &frame)?;
                         }
+                    }
 
-                        scale_context.scale(&frame, &mut output_frame);
-
-                        spritesheet_manager.add_image(
-                            timestamp,
-                            image::ImageBuffer::from_raw(
-                                output_frame.width() as u32,
-                                output_frame.height() as u32,
-                                output_frame.data(0).to_vec(),
-                            )
-                            .ok_or_else(|| format_err!("Could not process frame"))?,
-                        )?;
+                    if let Some(timelens_manager) = &mut timelens_manager {
+                        if timelens_manager.fulfils_frame_interval(timestamp) {
+                            if !timelens_manager.initialized() {
+                                timelens_manager.initialize()?;
+                            }
+                            timelens_manager.add_frame(&mut scale_context, scaler, flags, timestamp, &frame)?;
+                        }
                     }
                 }
             }
         }
 
-        spritesheet_manager.end_frame(duration);
-        spritesheet_manager.save()?;
+        if let Some(spritesheet_manager) = &mut spritesheet_manager {
+            spritesheet_manager.end_frame(duration);
+            spritesheet_manager.save()?;
+        }
+
+        if let Some(timelens_manager) = &mut timelens_manager {
+            timelens_manager.save()?;
+        }
     }
 
     Ok(())

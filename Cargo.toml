@@ -1,5 +1,5 @@
 [package]
-name = "media-ingestion"
+name = "preview-generator"
 version = "1.0.0"
 authors = ["Janne Mareike Koschinski <janne@kuschku.de>"]
 

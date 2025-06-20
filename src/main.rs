@@ -1,10 +1,12 @@
 use std::path::Path;
 
-use ffmpeg_api::enums::{SwsFlags, SwsScaler};
+use ffmpeg_api::enums::{AVDiscard, SwsFlags, SwsScaler};
 use image::ImageFormat as ImageOutputFormat;
 use media_time::MediaTime;
 use structopt::StructOpt;
-use media_ingestion::ExtractOptions;
+
+use preview_generator::spritesheet::SpritesheetOptions;
+use preview_generator::timelens::TimelensOptions;
 
 fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
     match src {
@@ -28,12 +30,8 @@ fn parse_scaler(src: &str) -> Result<SwsScaler, String> {
 struct Options {
     input: String,
     output: String,
-    #[structopt(long = "frame-interval", default_value = "2")]
-    frame_interval: f64,
-    #[structopt(long = "num-horizontal", default_value = "5")]
-    num_horizontal: u32,
-    #[structopt(long = "num-vertical", default_value = "5")]
-    num_vertical: u32,
+    #[structopt(long = "keyframe-interval", default_value = "2")]
+    keyframe_interval: f64, // in seconds
     #[structopt(long = "max-size", default_value = "240")]
     max_size: u32,
     #[structopt(long = "format", default_value = "jpg")]
@@ -46,8 +44,20 @@ struct Options {
     fast_rounding: bool,
     #[structopt(long = "fast-scaling")]
     fast_scaling: bool,
+
     #[structopt(long = "timelens")]
     timelens: bool,
+    #[structopt(long = "timelens-width", default_value = "1000")]
+    timelens_width: u32,
+    #[structopt(long = "timelens-height", default_value = "90")]
+    timelens_height: u32,
+
+    #[structopt(long = "spritesheet")]
+    spritesheet: bool,
+    #[structopt(long = "spritesheet-columns", default_value = "5")]
+    spritesheet_columns: u32,
+    #[structopt(long = "spritesheet-rows", default_value = "5")]
+    spritesheet_rows: u32,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -64,22 +74,37 @@ fn main() -> anyhow::Result<()> {
         flags |= SwsFlags::BIT_EXACT_SCALING;
     }
 
-    if let Err(err) = media_ingestion::extract(
+    if let Err(err) = preview_generator::extract(
         Path::new(&options.input),
         Path::new(&options.output),
-        ExtractOptions {
-            max_size: options.max_size,
-            num_horizontal: options.num_horizontal,
-            num_vertical: options.num_vertical,
-            frame_interval: MediaTime::from_seconds_f64(options.frame_interval),
-            format: match options.format.as_str() {
-                "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
-                "png" => ImageOutputFormat::Png,
-                "bmp" => ImageOutputFormat::Bmp,
-                _ => panic!("Unsupported image format: {}", options.format),
-            },
-            timelens: options.timelens,
-        },
+        if options.spritesheet {
+            Some(SpritesheetOptions {
+                max_size: options.max_size,
+                columns: options.spritesheet_columns,
+                rows: options.spritesheet_rows,
+                frame_interval: MediaTime::from_seconds_f64(options.keyframe_interval),
+                format: match options.format.as_str() {
+                    "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
+                    "png" => ImageOutputFormat::Png,
+                    "bmp" => ImageOutputFormat::Bmp,
+                    _ => panic!("Unsupported image format: {}", options.format),
+                },
+            })
+        } else { None },
+        if options.timelens {
+            Some(TimelensOptions {
+                width: options.timelens_width,
+                height: options.timelens_height,
+                frame_interval: MediaTime::from_seconds_f64(options.keyframe_interval),
+                format: match options.format.as_str() {
+                    "jpeg" | "jpg" => ImageOutputFormat::Jpeg,
+                    "png" => ImageOutputFormat::Png,
+                    "bmp" => ImageOutputFormat::Bmp,
+                    _ => panic!("Unsupported image format: {}", options.format),
+                },
+            })
+        } else { None },
+        AVDiscard::NonKey,
         options.scaler,
         flags,
     ) {

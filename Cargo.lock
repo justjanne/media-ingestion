@@ -627,21 +627,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "media-ingestion"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "ffmpeg_api",
- "fraction",
- "image",
- "media_time",
- "serde",
- "serde_json",
- "structopt",
- "webvtt",
-]
-
-[[package]]
 name = "media_time"
 version = "0.1.0"
 dependencies = [
@@ -838,6 +823,21 @@ checksum = "6837b9e10d61f45f987d50808f83d1ee3d206c66acf650c3e4ae2e1f6ddedf55"
 dependencies = [
  "proc-macro2",
  "syn 2.0.103",
+]
+
+[[package]]
+name = "preview-generator"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "ffmpeg_api",
+ "fraction",
+ "image",
+ "media_time",
+ "serde",
+ "serde_json",
+ "structopt",
+ "webvtt",
 ]
 
 [[package]]

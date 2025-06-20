@@ -2,15 +2,21 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 
-use anyhow::{bail, Error, format_err};
-use image::{DynamicImage, GenericImageView, ImageFormat as ImageOutputFormat, RgbImage};
-use media_time::MediaTime;
+use anyhow::{Error, format_err};
+use ffmpeg_api::api::{AVFrame, SwsContext};
+use ffmpeg_api::enums::{AVPixelFormat, SwsFlags, SwsScaler};
+use image::{DynamicImage, ImageFormat as ImageOutputFormat, RgbImage};
 use webvtt::{WebVTTCue, WebVTTFile};
-use crate::options::ExtractOptions;
+use media_time::MediaTime;
 
-pub enum ImageFormat {
-    Jpeg(i32),
-    Png,
+
+#[derive(Copy, Clone, Debug)]
+pub struct SpritesheetOptions {
+    pub max_size: u32,
+    pub columns: u32,
+    pub rows: u32,
+    pub frame_interval: MediaTime,
+    pub format: ImageOutputFormat,
 }
 
 pub struct SpritesheetManager {
@@ -28,19 +34,18 @@ pub struct SpritesheetManager {
     name: String,
     format: ImageOutputFormat,
     initialized: bool,
-    timelens: bool,
+    buffer: AVFrame,
 }
 
 impl SpritesheetManager {
     pub fn new(
-        options: ExtractOptions,
-        frame_count: u32,
+        options: SpritesheetOptions,
         output_path: impl Into<PathBuf>,
         name: impl AsRef<str>,
-    ) -> SpritesheetManager {
-        SpritesheetManager {
-            num_horizontal: if options.timelens { frame_count } else { options.num_horizontal },
-            num_vertical: if options.timelens { 1 } else { options.num_vertical },
+    ) -> Result<SpritesheetManager, Error> {
+        Ok(SpritesheetManager {
+            num_horizontal: options.columns,
+            num_vertical: options.rows,
             max_side: options.max_size,
             sprite_width: 0,
             sprite_height: 0,
@@ -53,23 +58,29 @@ impl SpritesheetManager {
             name: String::from(name.as_ref()),
             format: options.format,
             initialized: false,
-            timelens: options.timelens,
-        }
+            buffer: AVFrame::new()
+                .map_err(|error| format_err!("Could not create output frame: {}", error))?,
+        })
     }
 
-    pub fn initialize(&mut self, width: u32, height: u32) {
-        if self.timelens {
-            self.sprite_width = 1;
-            self.sprite_height = self.max_side;
-        } else if width >= height {
+    pub fn initialize(&mut self, width: u32, height: u32) -> Result<(), Error> {
+        if width >= height {
             self.sprite_width = self.max_side;
             self.sprite_height = self.sprite_width * height / width;
         } else {
             self.sprite_height = self.max_side;
             self.sprite_width = self.sprite_height * width / height;
         }
+        self.buffer.init(
+            self.sprite_width() as i32,
+            self.sprite_height() as i32,
+            AVPixelFormat::RGB24,
+        ).map_err(|error| {
+            format_err!("Could not init output frame: {}", error)
+        })?;
         self.spritesheet = self.reinit_buffer();
         self.initialized = true;
+        Ok(())
     }
 
     fn reinit_buffer(&self) -> RgbImage {
@@ -119,19 +130,18 @@ impl SpritesheetManager {
     }
 
     pub fn fulfils_frame_interval(&self, timestamp: MediaTime) -> bool {
-        self.current_image == 0 || timestamp - self.last_timestamp > self.frame_interval
+        self.current_image == 0 || (timestamp - self.last_timestamp > self.frame_interval)
     }
 
-    pub fn add_image(&mut self, timestamp: MediaTime, image: RgbImage) -> Result<(), Error> {
-        if image.width() != self.sprite_width || image.height() != self.sprite_height {
-            bail!(
-                "Wrong image size: {}x{}, but expected {}x{}",
-                image.width(),
-                image.height(),
-                self.sprite_width,
-                self.sprite_height
-            )
-        }
+    pub fn add_frame(&mut self, context: &mut SwsContext, scaler: SwsScaler, flags: SwsFlags, timestamp: MediaTime, frame: &AVFrame) -> Result<(), Error> {
+        context.reinit(frame, &self.buffer, scaler, flags)?;
+        context.scale(frame, &mut self.buffer);
+
+        let image = image::ImageBuffer::from_raw(
+            self.buffer.width() as u32,
+            self.buffer.height() as u32,
+            self.buffer.data(0).to_vec(),
+        ).ok_or_else(|| format_err!("Could not process frame"))?;
 
         let x: i64 = self.x(self.current_image).into();
         let y: i64 = self.y(self.current_image).into();
@@ -185,12 +195,8 @@ impl SpritesheetManager {
         let file = File::create(self.output_path.join(&name))
             .map_err(|err| format_err!("Could not create spritesheet {}: {}", &name, err))?;
 
-        let output = if self.timelens {
-            DynamicImage::ImageRgb8(self.spritesheet.view(0, 0, self.current_image, self.sprite_height).to_image())
-        } else {
-            let new_buffer = self.reinit_buffer();
-            DynamicImage::ImageRgb8(std::mem::replace(&mut self.spritesheet, new_buffer))
-        };
+        let new_buffer = self.reinit_buffer();
+        let output = DynamicImage::ImageRgb8(std::mem::replace(&mut self.spritesheet, new_buffer));
 
         output
             .write_to(&mut BufWriter::new(file), self.format)
