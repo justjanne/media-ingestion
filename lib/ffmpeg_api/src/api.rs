@@ -223,6 +223,10 @@ impl AVPacket {
         unsafe { self.base.as_ref() }.unwrap_or_else(|| panic!("AVPacket base unexpectedly null"))
     }
 
+    pub fn duration(&self) -> i64 {
+        self.as_ref().duration
+    }
+
     pub fn pts(&self) -> i64 {
         self.as_ref().pts
     }

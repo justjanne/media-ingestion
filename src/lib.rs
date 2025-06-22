@@ -59,7 +59,7 @@ pub fn extract(
     } else {
         None
     };
-    
+
     let mut timelens_manager: Option<timelens::TimelensManager> = if let Some(options) = timelens_options {
         Some(timelens::TimelensManager::new(
             options,
@@ -91,34 +91,52 @@ pub fn extract(
 
         while avformat_context.read_frame(&mut packet).is_ok() {
             if packet.stream_index() == index {
-                codec_context
-                    .in_packet(&mut packet)
-                    .map_err(|error| format_err!("Could not load packet: {}", error))?;
-                while codec_context.out_frame(&mut frame).is_ok() {
-                    let timestamp = media_time::MediaTime::from_rational(frame.pts(), &time_base)?;
+                let duration = media_time::MediaTime::from_rational(packet.duration(), &time_base)?;
+                let start = media_time::MediaTime::from_rational(packet.pts(), &time_base)?;
+                let end = start + duration;
 
-                    println!(
-                        "Frame {}: {} @ {}",
-                        frame.coded_picture_number(),
-                        timestamp,
-                        frame.key_frame()
-                    );
-                    
-                    if let Some(spritesheet_manager) = &mut spritesheet_manager {
-                        if spritesheet_manager.fulfils_frame_interval(timestamp) {
-                            if !spritesheet_manager.initialized() {
-                                spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32)?;
-                            }
-                            spritesheet_manager.add_frame(&mut scale_context, scaler, flags, timestamp, &frame)?;
-                        }
+                let mut skip = true;
+                if let Some(spritesheet_manager) = &mut spritesheet_manager {
+                    if spritesheet_manager.fulfils_frame_interval(end) {
+                        skip = false;
                     }
+                }
+                if let Some(timelens_manager) = &mut timelens_manager {
+                    if timelens_manager.fulfils_frame_interval(end) {
+                        skip = false;
+                    }
+                }
 
-                    if let Some(timelens_manager) = &mut timelens_manager {
-                        if timelens_manager.fulfils_frame_interval(timestamp) {
-                            if !timelens_manager.initialized() {
-                                timelens_manager.initialize()?;
+                if !skip {
+                    codec_context
+                        .in_packet(&mut packet)
+                        .map_err(|error| format_err!("Could not load packet: {}", error))?;
+                    while codec_context.out_frame(&mut frame).is_ok() {
+                        let timestamp = media_time::MediaTime::from_rational(frame.pts(), &time_base)?;
+
+                        println!(
+                            "Frame {}: {} @ {}",
+                            frame.coded_picture_number(),
+                            timestamp,
+                            frame.key_frame()
+                        );
+
+                        if let Some(spritesheet_manager) = &mut spritesheet_manager {
+                            if spritesheet_manager.fulfils_frame_interval(timestamp) {
+                                if !spritesheet_manager.initialized() {
+                                    spritesheet_manager.initialize(frame.width() as u32, frame.height() as u32)?;
+                                }
+                                spritesheet_manager.add_frame(&mut scale_context, scaler, flags, timestamp, &frame)?;
                             }
-                            timelens_manager.add_frame(&mut scale_context, scaler, flags, timestamp, &frame)?;
+                        }
+
+                        if let Some(timelens_manager) = &mut timelens_manager {
+                            if timelens_manager.fulfils_frame_interval(timestamp) {
+                                if !timelens_manager.initialized() {
+                                    timelens_manager.initialize()?;
+                                }
+                                timelens_manager.add_frame(&mut scale_context, scaler, flags, timestamp, &frame)?;
+                            }
                         }
                     }
                 }
